@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graphical Terminal</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- ヘッダーツールバー -->
+    <header class="toolbar">
+      <div class="toolbar-group">
+        <span class="app-title">Graphical Terminal</span>
+        <div class="divider"></div>
+        <div class="path-display">
+          <span class="path-label">今の作業フォルダ:</span>
+          <span id="currentCwd" class="path-text">読み込み中...</span>
+          <button id="btnChangeCwd" class="btn btn-subtle">場所を変える</button>
+        </div>
+      </div>
+      <div class="toolbar-group">
+        <button id="btnOpenCreateBlock" class="btn btn-default">+ 自分でブロックを作る</button>
+        <div class="divider"></div>
+        <label class="checkbox-label" title="途中で失敗したらそれ以降のブロックを動かさず安全に止めます">
+          <input type="checkbox" id="toggleStopOnError" checked>
+          <span>失敗したらすぐ止める</span>
+        </label>
+        <div class="divider"></div>
+        <label class="checkbox-label" title="パソコンの奥深くを変更するときONにします">
+          <input type="checkbox" id="toggleRunAsAdmin">
+          <span>管理者として動かす</span>
+        </label>
+        <div class="divider"></div>
+        <label class="checkbox-label">
+          <input type="checkbox" id="toggleShowCommands" checked>
+          <span>裏で動くコマンドを見る</span>
+        </label>
+        <button id="btnHelp" class="btn btn-subtle">使い方</button>
+      </div>
+    </header>
+
+    <!-- メインペイン -->
+    <div class="workbench">
+      <!-- 左サイドバー: パレット -->
+      <aside class="sidebar">
+        <!-- 検索バー（やりたいこと検索） -->
+        <div class="search-box">
+          <input type="text" id="blockSearchInput" class="search-input" placeholder="やりたいことを探す (例: 質問, 繰り返す, zip...)">
+        </div>
+
+        <!-- おすすめセット -->
+        <div class="sidebar-block" id="presetSection">
+          <div class="sidebar-header">すぐ使えるおすすめセット</div>
+          <div class="preset-group">
+            <button class="preset-btn" data-recipe="date-backup">
+              <span class="preset-name">今日の日付入りZip保存</span>
+              <span class="preset-desc">backup_20261108.zip を自動作成</span>
+            </button>
+            <button class="preset-btn" data-recipe="interactive-save">
+              <span class="preset-name">名前を聞いてファイル保存</span>
+              <span class="preset-desc">入力してもらった名前で保存</span>
+            </button>
+            <button class="preset-btn" data-recipe="pc-health">
+              <span class="preset-name">パソコンの健康診断</span>
+              <span class="preset-desc">メモリの空きや基本情報を確認</span>
+            </button>
+            <button class="preset-btn" data-recipe="diff-check">
+              <span class="preset-name">2つのファイルの違いを調べる</span>
+              <span class="preset-desc">新旧の文章を一行ずつ見比べる</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ブロック追加メニュー -->
+        <div class="sidebar-block" id="allBlocksSection">
+          <div class="sidebar-header">使えるブロック一覧</div>
+
+          <!-- 対話・繰り返し・条件（本格制御） -->
+          <div class="category">
+            <div class="category-name">頭脳・繰り返し・対話</div>
+            <button class="item-btn highlight" data-type="prompt-input">人に質問して文字を入力してもらう</button>
+            <button class="item-btn" data-type="loop-count">〇回繰り返す (指定回数)</button>
+            <button class="item-btn" data-type="foreach-loop">1行ずつ同じ処理を繰り返す</button>
+            <button class="item-btn" data-type="condition-if">もし〜なら／そうでなければ (If/Else)</button>
+            <button class="item-btn" data-type="set-env">設定メモを記憶する (環境変数)</button>
+          </div>
+
+          <!-- 便利なアクション・合図 -->
+          <div class="category">
+            <div class="category-name">便利なアクション・合図</div>
+            <button class="item-btn" data-type="copy-clipboard">結果をクリップボードにコピー</button>
+            <button class="item-btn" data-type="beep-sound">ピピッ！と音を鳴らす (お知らせ)</button>
+            <button class="item-btn" data-type="sleep-wait">〇秒待つ (一時停止)</button>
+            <button class="item-btn" data-type="diff-files">2つのファイルの違いを比べる</button>
+            <button class="item-btn" data-type="save-to-file">結果をファイルに書き出す (保存)</button>
+            <button class="item-btn" data-type="custom-command">自由に入力して動かす (何でも)</button>
+          </div>
+
+          <!-- ファイル・フォルダ -->
+          <div class="category">
+            <div class="category-name">ファイルとフォルダ</div>
+            <button class="item-btn" data-type="read-file">ファイルの中身を画面で見る</button>
+            <button class="item-btn" data-type="open-notepad">メモ帳で開いて編集する</button>
+            <button class="item-btn" data-type="list-files">中身の一覧を見る</button>
+            <button class="item-btn" data-type="search-files">ファイルを探す</button>
+            <button class="item-btn" data-type="copy-file">ファイルをコピーする</button>
+            <button class="item-btn item-danger" data-type="delete-file">ファイルをゴミ箱/削除</button>
+          </div>
+
+          <!-- 圧縮・解凍 (Zip) -->
+          <div class="category">
+            <div class="category-name">Zipの圧縮と解凍</div>
+            <button class="item-btn" data-type="zip-compress">フォルダをZipにまとめる (圧縮)</button>
+            <button class="item-btn" data-type="zip-extract">Zipを開いて取り出す (解凍)</button>
+          </div>
+
+          <!-- ネット・通信 -->
+          <div class="category">
+            <div class="category-name">インターネット・通信</div>
+            <button class="item-btn" data-type="check-port">ポート番号が使われているか調べる</button>
+            <button class="item-btn" data-type="web-download">ネットからファイルを保存する</button>
+            <button class="item-btn" data-type="web-api">Webからデータを取ってくる (API)</button>
+            <button class="item-btn" data-type="network-ping">ネットが繋がるか調べる (テスト)</button>
+          </div>
+
+          <!-- アプリ・ツールの追加 -->
+          <div class="category">
+            <div class="category-name">道具・プログラムの追加</div>
+            <button class="item-btn" data-type="pkg-install">必要なツールを入れる (インストール)</button>
+          </div>
+
+          <!-- 文字・データ探し -->
+          <div class="category">
+            <div class="category-name">文字やデータの処理</div>
+            <button class="item-btn" data-type="search-text">ファイルの中から文字を探す</button>
+            <button class="item-btn" data-type="count-lines">行の数や文字数を数える</button>
+          </div>
+
+          <!-- パソコンの情報 -->
+          <div class="category">
+            <div class="category-name">パソコンの状態</div>
+            <button class="item-btn" data-type="system-info">パソコンの基本情報を見る</button>
+            <button class="item-btn" data-type="process-list">今動いているアプリを見る</button>
+          </div>
+
+          <!-- バージョン管理 (Git) -->
+          <div class="category">
+            <div class="category-name">変更の記録 (Git)</div>
+            <button class="item-btn" data-type="git-status">どこが変わったか確認する</button>
+            <button class="item-btn" data-type="git-log">過去のセーブ履歴を見る</button>
+          </div>
+        </div>
+
+        <!-- ユーザー自作ブロック一覧 -->
+        <div class="sidebar-block" id="userBlocksSection" style="display: none;">
+          <div class="sidebar-header">あなたが作ったブロック</div>
+          <div class="category" id="userBlocksList"></div>
+        </div>
+      </aside>
+
+      <!-- 中央: キャンバス & 実行出力 -->
+      <main class="editor-pane">
+        <!-- キャンバス操作エリア -->
+        <div class="editor-header">
+          <div class="editor-meta">
+            <span class="section-title">並べたブロック</span>
+            <span id="blockCount" class="badge">0</span>
+            <span class="hint-date" title="ファイル名に {today} と書くと今日の日付に化けます">ヒント: <code>{today}</code> で今日の日付</span>
+          </div>
+          <div class="editor-controls">
+            <button id="btnClearCanvas" class="btn btn-default">全部消す</button>
+            <button id="btnRunAll" class="btn btn-primary">動かす (実行)</button>
+          </div>
+        </div>
+
+        <!-- ブロック配置エリア -->
+        <div class="canvas-area" id="canvas">
+          <div class="empty-state" id="emptyState">
+            <p>まだブロックがありません。</p>
+            <span class="empty-hint">左のメニューからブロックを選ぶか、上のおすすめセットをクリックしてみてください。</span>
+          </div>
+        </div>
+
+        <!-- 実行ログペイン -->
+        <section class="console-pane">
+          <div class="console-header">
+            <div class="console-title">
+              <span>実行結果</span>
+              <span id="statusBadge" class="status-indicator idle">待機中</span>
+              <span id="durationBadge" class="duration-text hidden"></span>
+            </div>
+            <div class="console-actions">
+              <button id="btnStopProcess" class="btn btn-danger-subtle hidden">途中で止める (中止)</button>
+              <button id="btnCopyLog" class="btn btn-subtle">結果をコピー</button>
+              <button id="btnClearLog" class="btn btn-subtle">画面をきれいにする</button>
+            </div>
+          </div>
+
+          <div id="explanationBox" class="note-box hidden"></div>
+          <pre id="outputLog" class="console-output">ここに実行結果が表示されます</pre>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- 質問入力ダイアログ (実行中のプロンプト) -->
+  <div id="promptModal" class="modal-backdrop hidden">
+    <div class="dialog">
+      <div class="dialog-title" id="promptModalTitle">質問</div>
+      <div class="dialog-body">
+        <label id="promptModalLabel" class="field-label">入力してください：</label>
+        <input type="text" id="promptModalInput" class="text-input" placeholder="">
+      </div>
+      <div class="dialog-footer">
+        <button id="btnPromptModalSubmit" class="btn btn-primary">決定して続ける</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自作ブロック作成モーダル -->
+  <div id="createBlockModal" class="modal-backdrop hidden">
+    <div class="dialog">
+      <div class="dialog-title">新しいブロックを自分で作る</div>
+      <div class="dialog-body">
+        <div>
+          <label class="field-label">ブロックの名前（わかりやすい名前）:</label>
+          <input type="text" id="newBlockName" class="text-input" placeholder="例: 動画のサイズを小さくする">
+        </div>
+        <div>
+          <label class="field-label">実行する命令 (コマンド):</label>
+          <input type="text" id="newBlockCmd" class="text-input" placeholder="例: docker stop {名前}">
+          <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: block;">
+            ヒント: <code>{名前}</code> のように波かっこで囲むと、あとから自分で文字を入力できる枠になります。
+          </span>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="btnCreateBlockCancel" class="btn btn-default">やめる</button>
+        <button id="btnCreateBlockSave" class="btn btn-primary">メニューに追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 削除の安全確認モーダル -->
+  <div id="confirmModal" class="modal-backdrop hidden">
+    <div class="dialog">
+      <div class="dialog-title">本当に消しても大丈夫ですか？</div>
+      <div class="dialog-body">
+        <p>以下のファイルを削除しようとしています。消すと元に戻せない場合があります：</p>
+        <div id="modalTargetDetails" class="code-preview"></div>
+        <label class="confirm-row">
+          <input type="checkbox" id="modalCheckbox">
+          <span>確認しました。本当に削除します</span>
+        </label>
+      </div>
+      <div class="dialog-footer">
+        <button id="btnModalCancel" class="btn btn-default">やめる</button>
+        <button id="btnModalConfirm" class="btn btn-danger" disabled>削除を実行する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ディレクトリ変更モーダル -->
+  <div id="cwdModal" class="modal-backdrop hidden">
+    <div class="dialog">
+      <div class="dialog-title">作業するフォルダの変更</div>
+      <div class="dialog-body">
+        <label class="field-label">移動したいフォルダの場所 (パス):</label>
+        <input type="text" id="inputNewCwd" class="text-input" placeholder="C:\Users\username\Desktop">
+      </div>
+      <div class="dialog-footer">
+        <button id="btnCwdCancel" class="btn btn-default">やめる</button>
+        <button id="btnCwdSave" class="btn btn-primary">変更する</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "name": "graphical-terminal",
+  "version": "0.1.0",
+  "description": "No-Code, Block-Based Graphical Terminal for Everyone",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "terminal",
+    "cli",
+    "graphical-terminal",
+    "no-code",
+    "gui",
+    "visual-programming",
+    "powershell",
+    "shell",
+    "beginner-friendly",
+    "open-source"
+  ],
+  "author": "Graphical Terminal Contributors",
+  "license": "MIT",
+  "homepage": "https://github.com/your-username/graphical-terminal",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/graphical-terminal.git"
+  }
+}
