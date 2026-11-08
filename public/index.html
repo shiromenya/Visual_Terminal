@@ -24,7 +24,8 @@
         </div>
       </div>
       <div class="toolbar-group">
-        <button id="btnOpenCreateBlock" class="btn btn-default">+ 自分でブロックを作る</button>
+        <button id="btnOpenCommandCatalog" class="btn btn-catalog">📖 全コマンド図鑑から探す</button>
+        <button id="btnOpenCreateBlock" class="btn btn-default">+ 自作ブロック</button>
         <div class="divider"></div>
         <label class="checkbox-label" title="途中で失敗したらそれ以降のブロックを動かさず安全に止めます">
           <input type="checkbox" id="toggleStopOnError" checked>
@@ -48,131 +49,458 @@
     <div class="workbench">
       <!-- 左サイドバー: パレット -->
       <aside class="sidebar">
-        <!-- 検索バー（やりたいこと検索） -->
-        <div class="search-box">
-          <input type="text" id="blockSearchInput" class="search-input" placeholder="やりたいことを探す (例: バッテリー, 修復, 同期...)">
+        <!-- 検索バー ＆ 折りたたみ一括操作 -->
+        <div class="sidebar-top-bar">
+          <div class="search-box">
+            <input type="text" id="blockSearchInput" class="search-input" placeholder="コマンドや機能を探す (sfc, robocopy, Wi-Fi...)">
+          </div>
+          <div class="sidebar-actions">
+            <span class="sidebar-label">全コマンド収納ライブラリ</span>
+            <div class="accordion-toggle-buttons">
+              <button id="btnExpandAll" class="btn-tiny" title="すべてのカテゴリを開く">すべて開く</button>
+              <button id="btnCollapseAll" class="btn-tiny" title="すべてのカテゴリを閉じる">すべて閉じる</button>
+            </div>
+          </div>
         </div>
 
         <!-- おすすめセット -->
-        <div class="sidebar-block" id="presetSection">
-          <div class="sidebar-header">すぐ使えるおすすめセット</div>
-          <div class="preset-group">
+        <details class="sidebar-accordion" id="presetAccordion">
+          <summary>
+            <div class="acc-header">
+              <span class="acc-chevron">▶</span>
+              <span class="acc-title">⭐ すぐ使えるおすすめセット</span>
+            </div>
+            <span class="acc-count">4</span>
+          </summary>
+          <div class="acc-content preset-group">
             <button class="preset-btn" data-recipe="battery-check">
               <span class="preset-name">ノートPCバッテリー診断</span>
               <span class="preset-desc">劣化状態・寿命をHTMLレポート出力</span>
             </button>
+            <button class="preset-btn" data-recipe="wifi-check">
+              <span class="preset-name">Wi-Fiパスワード確認</span>
+              <span class="preset-desc">保存したWi-Fiの暗号化キーを調べる</span>
+            </button>
             <button class="preset-btn" data-recipe="folder-sync">
               <span class="preset-name">フォルダの高速ミラー同期</span>
               <span class="preset-desc">robocopyで差分を完全バックアップ</span>
-            </button>
-            <button class="preset-btn" data-recipe="pc-repair">
-              <span class="preset-name">Windowsの健康チェック・修復</span>
-              <span class="preset-desc">ディスク故障検査とシステム修復</span>
             </button>
             <button class="preset-btn" data-recipe="date-backup">
               <span class="preset-name">今日の日付入りZip保存</span>
               <span class="preset-desc">backup_20261108.zip を自動作成</span>
             </button>
           </div>
-        </div>
+        </details>
 
-        <!-- ブロック追加メニュー -->
+        <!-- ブロック追加メニュー (折りたたみ式全コマンドライブラリ) -->
         <div class="sidebar-block" id="allBlocksSection">
-          <div class="sidebar-header">使えるブロック一覧</div>
+          
+          <!-- 1. よく使う基本操作 (最初から開いておく) -->
+          <details class="sidebar-accordion" open>
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">⚡ よく使う基本操作</span>
+              </div>
+              <span class="acc-count">8</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn highlight" data-type="list-files">
+                <span class="item-label">中身の一覧を見る</span>
+                <span class="item-cmd">dir / ls</span>
+              </button>
+              <button class="item-btn highlight" data-type="make-dir">
+                <span class="item-label">新しいフォルダを作る</span>
+                <span class="item-cmd">mkdir</span>
+              </button>
+              <button class="item-btn highlight" data-type="view-tree">
+                <span class="item-label">フォルダのツリー構造</span>
+                <span class="item-cmd">tree</span>
+              </button>
+              <button class="item-btn highlight" data-type="wifi-password">
+                <span class="item-label">Wi-Fiパスワード確認</span>
+                <span class="item-cmd">netsh</span>
+              </button>
+              <button class="item-btn highlight" data-type="flush-dns">
+                <span class="item-label">DNSキャッシュ消去</span>
+                <span class="item-cmd">ipconfig</span>
+              </button>
+              <button class="item-btn highlight" data-type="check-port">
+                <span class="item-label">ポート使用状況を調査</span>
+                <span class="item-cmd">port</span>
+              </button>
+              <button class="item-btn highlight" data-type="battery-report">
+                <span class="item-label">バッテリー寿命レポート</span>
+                <span class="item-cmd">powercfg</span>
+              </button>
+              <button class="item-btn highlight" data-type="custom-command">
+                <span class="item-label">自由なシェルコマンド実行</span>
+                <span class="item-cmd">shell</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- Windows公式の強力ツール (新設) -->
-          <div class="category">
-            <div class="category-name">Windows公式・メンテナンス</div>
-            <button class="item-btn highlight" data-type="battery-report">ノートPCのバッテリー寿命を調べる (powercfg)</button>
-            <button class="item-btn highlight" data-type="robocopy-sync">フォルダを丸ごと高速同期・バックアップ (robocopy)</button>
-            <button class="item-btn" data-type="disk-check">ドライブの故障・エラーを検査する (chkdsk)</button>
-            <button class="item-btn" data-type="sys-repair">壊れたシステムファイルを修復する (sfc)</button>
-            <button class="item-btn" data-type="device-drivers">繋がっている機器・ドライバ一覧 (driverquery)</button>
-            <button class="item-btn" data-type="toggle-hidden">隠しファイルに設定/解除する (attrib)</button>
-            <button class="item-btn" data-type="assoc-ext">拡張子をどのアプリで開くか調べる (assoc)</button>
-          </div>
+          <!-- 2. システム・診断・修復 -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">💻 システム・診断・修復</span>
+              </div>
+              <span class="acc-count">6</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn" data-type="sys-repair">
+                <span class="item-label">壊れたシステムファイルを修復</span>
+                <span class="item-cmd">sfc</span>
+              </button>
+              <button class="item-btn" data-type="disk-check">
+                <span class="item-label">ドライブの故障・エラー検査</span>
+                <span class="item-cmd">chkdsk</span>
+              </button>
+              <button class="item-btn" data-type="system-info">
+                <span class="item-label">OS・ハードウェア詳細情報</span>
+                <span class="item-cmd">systeminfo</span>
+              </button>
+              <button class="item-btn" data-type="driver-list">
+                <span class="item-label">インストール済みドライバ一覧</span>
+                <span class="item-cmd">driverquery</span>
+              </button>
+              <button class="item-btn" data-type="battery-report">
+                <span class="item-label">ノートPCバッテリー診断</span>
+                <span class="item-cmd">powercfg</span>
+              </button>
+              <button class="item-btn" data-type="dxdiag-run">
+                <span class="item-label">DirectX・グラフィック診断</span>
+                <span class="item-cmd">dxdiag</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- ファイルとフォルダの操作 -->
-          <div class="category">
-            <div class="category-name">ファイルとフォルダの操作</div>
-            <button class="item-btn" data-type="view-tree">フォルダの構造を木の枝の形で見せる (tree)</button>
-            <button class="item-btn" data-type="make-dir">新しいフォルダを作る (mkdir)</button>
-            <button class="item-btn" data-type="move-file">ファイルを別の場所に移動する (move)</button>
-            <button class="item-btn" data-type="rename-file">ファイルやフォルダの名前を変える (ren)</button>
-            <button class="item-btn" data-type="list-files">中身の一覧を見る (dir/ls)</button>
-            <button class="item-btn" data-type="search-files">ファイルを探す</button>
-            <button class="item-btn" data-type="copy-file">ファイルをコピーする (copy)</button>
-            <button class="item-btn" data-type="read-file">ファイルの中身を画面で見る (type)</button>
-            <button class="item-btn" data-type="open-notepad">メモ帳で開いて編集する</button>
-            <button class="item-btn item-danger" data-type="delete-file">ファイルをゴミ箱/削除 (del)</button>
-          </div>
+          <!-- 3. ネットワーク・通信 -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">🌐 ネットワーク・通信</span>
+              </div>
+              <span class="acc-count">9</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn" data-type="show-ip">
+                <span class="item-label">自分のIPアドレスを調べる</span>
+                <span class="item-cmd">ipconfig</span>
+              </button>
+              <button class="item-btn" data-type="flush-dns">
+                <span class="item-label">DNSキャッシュを消去</span>
+                <span class="item-cmd">/flushdns</span>
+              </button>
+              <button class="item-btn" data-type="wifi-password">
+                <span class="item-label">Wi-Fiパスワードを調べる</span>
+                <span class="item-cmd">netsh wlan</span>
+              </button>
+              <button class="item-btn" data-type="check-port">
+                <span class="item-label">ポート番号の使用調査</span>
+                <span class="item-cmd">port</span>
+              </button>
+              <button class="item-btn" data-type="netstat-ports">
+                <span class="item-label">通信中ポート・PID全一覧</span>
+                <span class="item-cmd">netstat -ano</span>
+              </button>
+              <button class="item-btn" data-type="network-ping">
+                <span class="item-label">疎通確認・応答速度</span>
+                <span class="item-cmd">ping</span>
+              </button>
+              <button class="item-btn" data-type="trace-route">
+                <span class="item-label">通信経路ルーティング追跡</span>
+                <span class="item-cmd">tracert</span>
+              </button>
+              <button class="item-btn" data-type="arp-scan">
+                <span class="item-label">LAN内機器MACアドレス一覧</span>
+                <span class="item-cmd">arp -a</span>
+              </button>
+              <button class="item-btn" data-type="web-download">
+                <span class="item-label">WebからファイルDL</span>
+                <span class="item-cmd">curl</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- インターネット・ネットワーク診断 -->
-          <div class="category">
-            <div class="category-name">インターネット・ネットワーク診断</div>
-            <button class="item-btn" data-type="show-ip">自分のIPアドレスを調べる (ipconfig)</button>
-            <button class="item-btn" data-type="check-port">ポート番号が使われているか調べる</button>
-            <button class="item-btn" data-type="network-ping">ネットが繋がるか調べる (ping)</button>
-            <button class="item-btn" data-type="trace-route">通信の通り道を調べる (tracert)</button>
-            <button class="item-btn" data-type="web-download">ネットからファイルを保存する</button>
-            <button class="item-btn" data-type="web-api">Webからデータを取ってくる (API)</button>
-          </div>
+          <!-- 4. ストレージ・ディスク管理 -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">🗄️ ストレージ・ディスク</span>
+              </div>
+              <span class="acc-count">5</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn" data-type="disk-free-space">
+                <span class="item-label">各ドライブの空き容量</span>
+                <span class="item-cmd">fsutil</span>
+              </button>
+              <button class="item-btn" data-type="compact-disk">
+                <span class="item-label">NTFSファイル圧縮で容量削減</span>
+                <span class="item-cmd">compact</span>
+              </button>
+              <button class="item-btn item-danger" data-type="cipher-wipe">
+                <span class="item-label">空き領域の完全抹消 (復元不可)</span>
+                <span class="item-cmd">cipher /w</span>
+              </button>
+              <button class="item-btn" data-type="defrag-drive">
+                <span class="item-label">ドライブ最適化・デフラグ</span>
+                <span class="item-cmd">defrag</span>
+              </button>
+              <button class="item-btn" data-type="vol-info">
+                <span class="item-label">ボリュームシリアル確認</span>
+                <span class="item-cmd">vol</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- パソコンの状態と電源 -->
-          <div class="category">
-            <div class="category-name">パソコンの状態と電源</div>
-            <button class="item-btn" data-type="system-info">パソコンの詳しい情報を見る (systeminfo)</button>
-            <button class="item-btn" data-type="process-list">今動いているアプリ一覧</button>
-            <button class="item-btn" data-type="timer-shutdown">指定時間後に電源を切る/再起動 (shutdown)</button>
-          </div>
+          <!-- 5. ファイル・検索・高速同期 -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">📁 ファイル・検索・同期</span>
+              </div>
+              <span class="acc-count">12</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn" data-type="robocopy-sync">
+                <span class="item-label">フォルダ丸ごと高速同期</span>
+                <span class="item-cmd">robocopy</span>
+              </button>
+              <button class="item-btn" data-type="list-files">
+                <span class="item-label">ファイル一覧表示</span>
+                <span class="item-cmd">dir / ls</span>
+              </button>
+              <button class="item-btn" data-type="view-tree">
+                <span class="item-label">フォルダツリー表示</span>
+                <span class="item-cmd">tree</span>
+              </button>
+              <button class="item-btn" data-type="make-dir">
+                <span class="item-label">新規フォルダ作成</span>
+                <span class="item-cmd">mkdir</span>
+              </button>
+              <button class="item-btn" data-type="search-files">
+                <span class="item-label">ファイル名検索</span>
+                <span class="item-cmd">find</span>
+              </button>
+              <button class="item-btn" data-type="find-str">
+                <span class="item-label">ファイル内文字列検索 (Grep)</span>
+                <span class="item-cmd">findstr</span>
+              </button>
+              <button class="item-btn" data-type="where-cmd">
+                <span class="item-label">コマンド実体パス検索</span>
+                <span class="item-cmd">where</span>
+              </button>
+              <button class="item-btn" data-type="file-checksum">
+                <span class="item-label">SHA256ハッシュ計算</span>
+                <span class="item-cmd">certutil</span>
+              </button>
+              <button class="item-btn" data-type="file-attrib">
+                <span class="item-label">属性変更・隠しファイル解除</span>
+                <span class="item-cmd">attrib</span>
+              </button>
+              <button class="item-btn" data-type="diff-files">
+                <span class="item-label">2つのファイル比較 (差分)</span>
+                <span class="item-cmd">fc / diff</span>
+              </button>
+              <button class="item-btn" data-type="copy-file">
+                <span class="item-label">ファイルコピー</span>
+                <span class="item-cmd">copy</span>
+              </button>
+              <button class="item-btn item-danger" data-type="delete-file">
+                <span class="item-label">ファイル削除</span>
+                <span class="item-cmd">del / rm</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- 頭脳・繰り返し・対話 -->
-          <div class="category">
-            <div class="category-name">頭脳・繰り返し・対話</div>
-            <button class="item-btn" data-type="prompt-input">人に質問して文字を入力してもらう</button>
-            <button class="item-btn" data-type="loop-count">〇回繰り返す (指定回数)</button>
-            <button class="item-btn" data-type="foreach-loop">1行ずつ同じ処理を繰り返す</button>
-            <button class="item-btn" data-type="condition-if">もし〜なら／そうでなければ (If/Else)</button>
-            <button class="item-btn" data-type="set-env">設定メモを記憶する (環境変数)</button>
-          </div>
+          <!-- 6. プロセス・サービス・電源 -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">⚙️ プロセス・サービス・電源</span>
+              </div>
+              <span class="acc-count">6</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn" data-type="process-list">
+                <span class="item-label">実行中プロセス一覧</span>
+                <span class="item-cmd">tasklist</span>
+              </button>
+              <button class="item-btn" data-type="task-kill-name">
+                <span class="item-label">アプリの強制終了</span>
+                <span class="item-cmd">taskkill</span>
+              </button>
+              <button class="item-btn" data-type="service-list">
+                <span class="item-label">Windowsサービス稼働確認</span>
+                <span class="item-cmd">sc query</span>
+              </button>
+              <button class="item-btn" data-type="schtasks-list">
+                <span class="item-label">タスクスケジューラ一覧</span>
+                <span class="item-cmd">schtasks</span>
+              </button>
+              <button class="item-btn" data-type="timer-shutdown">
+                <span class="item-label">タイマー電源OFF / 再起動</span>
+                <span class="item-cmd">shutdown</span>
+              </button>
+              <button class="item-btn" data-type="open-notepad">
+                <span class="item-label">メモ帳で開いて編集</span>
+                <span class="item-cmd">notepad</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- 便利なアクション・合図 -->
-          <div class="category">
-            <div class="category-name">便利なアクション・合図</div>
-            <button class="item-btn" data-type="copy-clipboard">結果をクリップボードにコピー</button>
-            <button class="item-btn" data-type="beep-sound">ピピッ！と音を鳴らす (お知らせ)</button>
-            <button class="item-btn" data-type="sleep-wait">〇秒待つ (一時停止)</button>
-            <button class="item-btn" data-type="diff-files">2つのファイルの違いを比べる</button>
-            <button class="item-btn" data-type="save-to-file">結果をファイルに書き出す (保存)</button>
-            <button class="item-btn" data-type="custom-command">自由に入力して動かす (何でも)</button>
-          </div>
+          <!-- 7. セキュリティ・ユーザー -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">🔒 セキュリティ・権限</span>
+              </div>
+              <span class="acc-count">4</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn" data-type="whoami-info">
+                <span class="item-label">ユーザー名と権限SID確認</span>
+                <span class="item-cmd">whoami</span>
+              </button>
+              <button class="item-btn" data-type="net-user-list">
+                <span class="item-label">登録ユーザーアカウント一覧</span>
+                <span class="item-cmd">net user</span>
+              </button>
+              <button class="item-btn" data-type="net-group-list">
+                <span class="item-label">ローカルグループ・管理者一覧</span>
+                <span class="item-cmd">net group</span>
+              </button>
+              <button class="item-btn" data-type="group-policy">
+                <span class="item-label">グループポリシー適用状態</span>
+                <span class="item-cmd">gpresult</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- Zipの圧縮と解凍 -->
-          <div class="category">
-            <div class="category-name">Zipの圧縮と解凍</div>
-            <button class="item-btn" data-type="zip-compress">フォルダをZipにまとめる (圧縮)</button>
-            <button class="item-btn" data-type="zip-extract">Zipを開いて取り出す (解凍)</button>
-          </div>
+          <!-- 8. レジストリ・高度な設定 -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">🛠️ レジストリ・高度な設定</span>
+              </div>
+              <span class="acc-count">3</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn" data-type="reg-query">
+                <span class="item-label">レジストリキーの読み取り</span>
+                <span class="item-cmd">reg query</span>
+              </button>
+              <button class="item-btn" data-type="setx-env">
+                <span class="item-label">環境変数を永久保存</span>
+                <span class="item-cmd">setx</span>
+              </button>
+              <button class="item-btn" data-type="bcdedit-info">
+                <span class="item-label">ブートローダー構成情報</span>
+                <span class="item-cmd">bcdedit</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- 道具・プログラムの追加 -->
-          <div class="category">
-            <div class="category-name">道具・プログラムの追加</div>
-            <button class="item-btn" data-type="pkg-install">必要なツールを入れる (インストール)</button>
-          </div>
+          <!-- 9. 圧縮・ツール・Git -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">📦 圧縮・ツール・Git</span>
+              </div>
+              <span class="acc-count">5</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn" data-type="zip-compress">
+                <span class="item-label">Zipアーカイブ圧縮</span>
+                <span class="item-cmd">zip / tar</span>
+              </button>
+              <button class="item-btn" data-type="zip-extract">
+                <span class="item-label">Zipアーカイブ展開</span>
+                <span class="item-cmd">unzip</span>
+              </button>
+              <button class="item-btn" data-type="pkg-install">
+                <span class="item-label">パッケージインストール</span>
+                <span class="item-cmd">npm/pip</span>
+              </button>
+              <button class="item-btn" data-type="git-status">
+                <span class="item-label">Git変更状況チェック</span>
+                <span class="item-cmd">git status</span>
+              </button>
+              <button class="item-btn" data-type="git-log">
+                <span class="item-label">Gitコミット履歴確認</span>
+                <span class="item-cmd">git log</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- 文字やデータの処理 -->
-          <div class="category">
-            <div class="category-name">文字やデータの処理</div>
-            <button class="item-btn" data-type="search-text">ファイルの中から文字を探す (find)</button>
-            <button class="item-btn" data-type="count-lines">行の数や文字数を数える</button>
-          </div>
+          <!-- 10. プログラミング・ロジック・Shell -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">🧩 ロジック・自動化・Shell</span>
+              </div>
+              <span class="acc-count">11</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn highlight" data-type="custom-command">
+                <span class="item-label">自由なシェルコマンド</span>
+                <span class="item-cmd">custom shell</span>
+              </button>
+              <button class="item-btn" data-type="pipe-filter">
+                <span class="item-label">前の結果から文字で抽出 (Pipe)</span>
+                <span class="item-cmd">| grep / match</span>
+              </button>
+              <button class="item-btn" data-type="pipe-sort">
+                <span class="item-label">前の結果を並べ替え (Pipe)</span>
+                <span class="item-cmd">| sort</span>
+              </button>
+              <button class="item-btn" data-type="pipe-head">
+                <span class="item-label">前の結果の先頭〇行 (Pipe)</span>
+                <span class="item-cmd">| head</span>
+              </button>
+              <button class="item-btn" data-type="condition-if">
+                <span class="item-label">もし〜なら (If/Else)</span>
+                <span class="item-cmd">if / else</span>
+              </button>
+              <button class="item-btn" data-type="loop-count">
+                <span class="item-label">〇回ループ (Count)</span>
+                <span class="item-cmd">for loop</span>
+              </button>
+              <button class="item-btn" data-type="foreach-loop">
+                <span class="item-label">1行ずつ繰り返し</span>
+                <span class="item-cmd">foreach</span>
+              </button>
+              <button class="item-btn" data-type="prompt-input">
+                <span class="item-label">人に対話質問して入力</span>
+                <span class="item-cmd">prompt</span>
+              </button>
+              <button class="item-btn" data-type="copy-clipboard">
+                <span class="item-label">結果をクリップボードへ</span>
+                <span class="item-cmd">clip</span>
+              </button>
+              <button class="item-btn" data-type="save-to-file">
+                <span class="item-label">結果をファイル保存</span>
+                <span class="item-cmd">redirect &gt;</span>
+              </button>
+              <button class="item-btn" data-type="sleep-wait">
+                <span class="item-label">〇秒一時停止</span>
+                <span class="item-cmd">sleep</span>
+              </button>
+            </div>
+          </details>
 
-          <!-- バージョン管理 (Git) -->
-          <div class="category">
-            <div class="category-name">変更の記録 (Git)</div>
-            <button class="item-btn" data-type="git-status">どこが変わったか確認する</button>
-            <button class="item-btn" data-type="git-log">過去のセーブ履歴を見る</button>
-          </div>
         </div>
 
         <!-- ユーザー自作ブロック一覧 -->
@@ -192,6 +520,8 @@
             <span class="hint-date" title="ファイル名に {today} と書くと今日の日付に化けます">ヒント: <code>{today}</code> で今日の日付</span>
           </div>
           <div class="editor-controls">
+            <button id="btnExportScript" class="btn btn-default" title="PowerShell (.ps1) や Bash (.sh) として書き出す">📥 スクリプト書出</button>
+            <button id="btnRecipeModal" class="btn btn-default" title="ブロックの組み合わせをファイルに保存/読込">💾 レシピ保存/読込</button>
             <button id="btnClearCanvas" class="btn btn-default">全部消す</button>
             <button id="btnRunAll" class="btn btn-primary">動かす (実行)</button>
           </div>
@@ -224,6 +554,25 @@
           <pre id="outputLog" class="console-output">ここに実行結果が表示されます</pre>
         </section>
       </main>
+    </div>
+  </div>
+
+  <!-- 📖 全コマンド図鑑モーダル (全280+コマンドの目的別カタログ) -->
+  <div id="catalogModal" class="modal-backdrop hidden">
+    <div class="dialog catalog-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">📖 Windows全コマンド図鑑（逆引きカタログ）</div>
+          <div class="dialog-desc">やりたいことから探して、クリックするだけでブロックとして追加できます。</div>
+        </div>
+        <button id="btnCatalogClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div class="catalog-search-bar">
+        <input type="text" id="catalogSearchInput" class="search-input" placeholder="やりたいことや機能名で検索 (例: 暗号化, Wi-Fi, メディア, ディスク, 復元...)">
+      </div>
+      <div class="catalog-grid" id="catalogGrid">
+        <!-- JSで全コマンドカードを動的生成 -->
+      </div>
     </div>
   </div>
 
@@ -295,6 +644,66 @@
       <div class="dialog-footer">
         <button id="btnCwdCancel" class="btn btn-default">やめる</button>
         <button id="btnCwdSave" class="btn btn-primary">変更する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📥 スクリプト書き出しモーダル (PowerShell / Bash / バッチ) -->
+  <div id="exportScriptModal" class="modal-backdrop hidden">
+    <div class="dialog export-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">📥 スクリプトとして書き出す (Export)</div>
+          <div class="dialog-desc">並べたブロックを、本番サーバーやPCで直接動かせるスクリプトファイルとして出力します。</div>
+        </div>
+        <button id="btnExportClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div class="dialog-body">
+        <div class="export-tabs">
+          <button class="tab-btn active" data-export-type="ps1">Windows PowerShell (.ps1)</button>
+          <button class="tab-btn" data-export-type="sh">macOS / Linux Bash (.sh)</button>
+          <button class="tab-btn" data-export-type="bat">Windows バッチ (.bat)</button>
+        </div>
+        <div class="export-meta-row">
+          <span id="exportTargetLabel" class="export-format-info">PowerShell スクリプト形式</span>
+          <div class="export-actions-bar">
+            <button id="btnCopyExportScript" class="btn btn-subtle">コードをコピー</button>
+            <button id="btnDownloadExportScript" class="btn btn-primary">ファイルとして保存 (ダウンロード)</button>
+          </div>
+        </div>
+        <pre id="exportCodePreview" class="code-preview export-pre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 💾 レシピ保存 / 読込モーダル (JSON共有) -->
+  <div id="recipeModal" class="modal-backdrop hidden">
+    <div class="dialog recipe-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">💾 レシピの保存と共有 (JSON)</div>
+          <div class="dialog-desc">並べたブロックと設定をファイルに保存して、チームや同僚と共有できます。</div>
+        </div>
+        <button id="btnRecipeClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div class="dialog-body recipe-dialog-body">
+        <!-- エクスポート -->
+        <div class="recipe-card-box">
+          <div class="recipe-box-title">📤 今のブロックを書き出す</div>
+          <p class="recipe-box-desc">今のキャンバスのブロック設定を JSON ファイルとして保存します。</p>
+          <div class="field-row">
+            <input type="text" id="recipeExportName" class="text-input" placeholder="レシピ名 (例: PC初期設定, サーバー点検)" value="my_workflow">
+            <button id="btnDownloadRecipeJson" class="btn btn-primary">JSONを保存</button>
+          </div>
+        </div>
+        <!-- インポート -->
+        <div class="recipe-card-box">
+          <div class="recipe-box-title">📥 レシピファイルを読み込む</div>
+          <p class="recipe-box-desc">保存した <code>.json</code> レシピファイルを選んで、キャンバスに展開します。</p>
+          <div class="field-row">
+            <input type="file" id="recipeFileInput" accept=".json" class="file-input">
+          </div>
+        </div>
       </div>
     </div>
   </div>

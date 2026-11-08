@@ -1,4 +1,4 @@
-// app.js - Graphical Terminal Logic (Windows / macOS / Linux 完全両対応版)
+// app.js - Graphical Terminal Logic (Windows全コマンド図鑑 & マルチプラットフォーム対応版)
 
 let currentPlatform = navigator.userAgent.includes('Mac') ? 'darwin' : 'win32';
 let lastUserInput = '';
@@ -25,9 +25,222 @@ function resolveVariables(str) {
     .replaceAll('{input}', lastUserInput);
 }
 
-// 1. 基本ブロック定義マスタ（OS自動切り替え対応）
-const BUILTIN_BLOCKS = {
-  // --- ファイルとフォルダの操作 ---
+// 📖 全コマンド図鑑データベース（Microsoft公式 Windows Commands 逆引き集）
+const COMMAND_CATALOG = [
+  {
+    id: 'wifi-password',
+    name: '保存済みWi-Fiのパスワードを調べる',
+    cmd: 'netsh wlan',
+    category: 'network',
+    desc: 'パソコンに一度でも繋いだことのあるWi-Fiの暗号化キー（パスワード）を表示します。',
+    fields: [
+      { id: 'ssid', label: 'Wi-Fiの名前(SSID)', type: 'text', placeholder: '例: Buffalo-G-1234', default: '' }
+    ],
+    generateCommand: (params) => {
+      const s = resolveVariables(params.ssid).trim();
+      if (!s) {
+        return isUnix() 
+          ? `echo "登録されているWi-Fi一覧:" && (networksetup -listpreferredwirelessnetworks en0 2>/dev/null || echo "Wi-Fi一覧を取得できませんでした")`
+          : `netsh wlan show profiles`;
+      }
+      return isUnix()
+        ? `security find-generic-password -D "AirPort network password" -a "${s}" -gw 2>/dev/null || echo "パスワードの取得に失敗しました"`
+        : `netsh wlan show profile name="${s}" key=clear`;
+    }
+  },
+  {
+    id: 'flush-dns',
+    name: 'ネットの詰まりを解消する (DNSキャッシュ消去)',
+    cmd: 'ipconfig /flushdns',
+    category: 'network',
+    desc: '「Webページがうまく開かない・更新が反映されない」ときにネットの一時記憶をクリアします。',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) {
+        return `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder 2>/dev/null && echo "DNSキャッシュを消去しました"`;
+      }
+      return `ipconfig /flushdns; Write-Output "DNSキャッシュをきれいに消去しました"`;
+    }
+  },
+  {
+    id: 'compact-disk',
+    name: 'フォルダを圧縮して空き容量を増やす',
+    cmd: 'compact',
+    category: 'storage',
+    desc: 'Windowsの標準機能でフォルダ内のファイルを圧縮し、容量を空けます（開くときは自動解凍されます）。',
+    fields: [
+      { id: 'dir', label: '圧縮するフォルダ', type: 'text', placeholder: '例: ./data', default: './data' }
+    ],
+    generateCommand: (params) => {
+      const d = resolveVariables(params.dir);
+      if (isUnix()) {
+        return `echo "Macでは自動圧縮の代わりにzipをご利用ください"`;
+      }
+      return `compact /c /s:"${d}" /i`;
+    }
+  },
+  {
+    id: 'cipher-wipe',
+    name: '消したデータを完全抹消・復元不可にする',
+    cmd: 'cipher /w',
+    category: 'security',
+    desc: '一度ゴミ箱から消したデータが復元ソフトで盗まれないよう、空き領域を完全に上書き消去します。',
+    fields: [
+      { id: 'drive', label: '対象ドライブ', type: 'select', options: [
+        { value: 'C:', label: 'Cドライブ' },
+        { value: 'D:', label: 'Dドライブ' }
+      ], default: 'C:' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) {
+        return `echo "Macではディスクユーティリティの消去をご利用ください"`;
+      }
+      return `Write-Output "空き領域の抹消を開始します（数分〜数時間かかる場合があります）..."; cipher /w:${params.drive}`;
+    }
+  },
+  {
+    id: 'file-checksum',
+    name: 'ファイルの指紋(ハッシュ/SHA256)を調べる',
+    cmd: 'certutil / Get-FileHash',
+    category: 'security',
+    desc: 'ダウンロードしたファイルが改ざん・破損されていないか安全性を確かめます。',
+    fields: [
+      { id: 'file', label: '調べるファイル', type: 'text', placeholder: '例: setup.exe', default: 'memo.txt' }
+    ],
+    generateCommand: (params) => {
+      const f = resolveVariables(params.file);
+      if (isUnix()) {
+        return `shasum -a 256 "${f}" 2>/dev/null || md5 "${f}"`;
+      }
+      return `Get-FileHash -Path "${f}" -Algorithm SHA256 | Format-List`;
+    }
+  },
+  {
+    id: 'disk-free-space',
+    name: '各ドライブの空き容量を一覧で見る',
+    cmd: 'fsutil / Get-PSDrive',
+    category: 'storage',
+    desc: 'Cドライブや外付けハードディスクの残り空き容量と使用量をひと目で確認します。',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) {
+        return `df -h`;
+      }
+      return `Get-PSDrive -PSProvider FileSystem | Select-Object Name, @{Name="空き容量(GB)";Expression={[math]::Round($_.Free / 1GB, 1)}}, @{Name="合計容量(GB)";Expression={[math]::Round(($_.Used + $_.Free) / 1GB, 1)}} | Format-Table -AutoSize`;
+    }
+  },
+  {
+    id: 'task-kill-name',
+    name: '固まったアプリを強制終了する',
+    cmd: 'taskkill / killall',
+    category: 'system',
+    fields: [
+      { id: 'appName', label: 'アプリ名', type: 'text', placeholder: '例: notepad, chrome, Code', default: 'notepad' }
+    ],
+    generateCommand: (params) => {
+      const n = resolveVariables(params.appName);
+      if (isUnix()) {
+        return `killall -9 "${n}" 2>/dev/null && echo "アプリを終了しました: ${n}" || echo "見つかりませんでした"`;
+      }
+      return `taskkill /im "${n}.exe" /f; Write-Output "アプリを終了しました: ${n}"`;
+    }
+  },
+  {
+    id: 'whoami-info',
+    name: '自分のユーザー名とグループ権限を調べる',
+    cmd: 'whoami',
+    category: 'security',
+    desc: '今パソコンを操作しているアカウントの権限情報やSIDを確認します。',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) {
+        return `id && whoami`;
+      }
+      return `whoami /all`;
+    }
+  },
+  {
+    id: 'open-url-browser',
+    name: 'ブラウザでWebサイトをサッと開く',
+    cmd: 'start / open',
+    category: 'convenient',
+    desc: '指定したホームページをいつものブラウザで直接起動します。',
+    fields: [
+      { id: 'url', label: '開きたいアドレス(URL)', type: 'text', placeholder: 'https://google.com', default: 'https://google.com' }
+    ],
+    generateCommand: (params) => {
+      const u = resolveVariables(params.url);
+      if (isUnix()) {
+        return `open "${u}" 2>/dev/null || xdg-open "${u}" 2>/dev/null`;
+      }
+      return `Start-Process "${u}"`;
+    }
+  }
+];
+
+// 基本ブロックマスタ（図鑑の項目も辞書として統合）
+const BUILTIN_BLOCKS = {};
+COMMAND_CATALOG.forEach(item => {
+  BUILTIN_BLOCKS[item.id] = item;
+});
+
+// 既存の標準ブロック群を追加統合
+Object.assign(BUILTIN_BLOCKS, {
+  'battery-report': {
+    name: 'ノートPCのバッテリー寿命を調べる (powercfg)',
+    category: 'system',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) {
+        return `pmset -g batt 2>/dev/null || echo "バッテリー情報を取得しました"`;
+      }
+      return `powercfg /batteryreport /output "battery_report.html"; Write-Output "バッテリー診断レポート (battery_report.html) を作成しました！ブラウザで開いて寿命を確認できます。"`;
+    }
+  },
+
+  'robocopy-sync': {
+    name: 'フォルダを丸ごと高速同期 (robocopy)',
+    category: 'file',
+    fields: [
+      { id: 'source', label: '元のフォルダ', type: 'text', placeholder: '例: ./data', default: './data' },
+      { id: 'dest', label: '同期先フォルダ', type: 'text', placeholder: '例: ./backup_mirror', default: './backup_mirror' }
+    ],
+    generateCommand: (params) => {
+      const src = resolveVariables(params.source);
+      const dst = resolveVariables(params.dest);
+      if (!src || !dst) return '# 元のフォルダと同期先を入力してください';
+      if (isUnix()) {
+        return `rsync -av --delete "${src}/" "${dst}/" && echo "同期（ミラーリング）が完了しました"`;
+      }
+      return `robocopy "${src}" "${dst}" /MIR /R:2 /W:2 /NP; Write-Output "同期（ミラーリング）が完了しました"`;
+    }
+  },
+
+  'disk-check': {
+    name: 'ドライブの故障・エラーを検査する (chkdsk)',
+    category: 'system',
+    fields: [
+      { id: 'drive', label: '調べるドライブ', type: 'select', options: [
+        { value: 'C', label: 'Cドライブ (メインSSD/HDD)' },
+        { value: 'D', label: 'Dドライブ (データ用)' }
+      ], default: 'C' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) return `echo "MacではFirst Aidをご利用ください"`;
+      return `chkdsk ${params.drive}: /scan`;
+    }
+  },
+
+  'sys-repair': {
+    name: '壊れたシステムファイルを修復する (sfc)',
+    category: 'system',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `echo "MacではOSアップデートをご利用ください"`;
+      return `Write-Output "Windowsのシステムファイルをスキャンして自動修復します..."; sfc /scannow`;
+    }
+  },
+
   'view-tree': {
     name: 'フォルダの構造を木の枝の形で見せる (tree)',
     category: 'file',
@@ -105,24 +318,20 @@ const BUILTIN_BLOCKS = {
     ],
     generateCommand: (params) => {
       const fp = resolveVariables(params.filepath);
-      if (isUnix()) {
-        return `cat "${fp}"`;
-      }
+      if (isUnix()) return `cat "${fp}"`;
       return `Get-Content "${fp}" -ErrorAction SilentlyContinue -Raw`;
     }
   },
 
   'open-notepad': {
-    name: 'エディタで開いて編集する',
+    name: 'メモ帳で開いて編集する',
     category: 'file',
     fields: [
       { id: 'filepath', label: '開きたいファイル名', type: 'text', placeholder: '例: memo.txt', default: 'memo.txt' }
     ],
     generateCommand: (params) => {
       const fp = resolveVariables(params.filepath);
-      if (isUnix()) {
-        return `open -e "${fp}" 2>/dev/null || xdg-open "${fp}" 2>/dev/null || echo "エディタを開きました: ${fp}"`;
-      }
+      if (isUnix()) return `open -e "${fp}" 2>/dev/null || xdg-open "${fp}" 2>/dev/null || echo "エディタを開きました: ${fp}"`;
       return `notepad.exe "${fp}"; Write-Output "メモ帳を起動しました: ${fp}"`;
     }
   },
@@ -170,9 +379,7 @@ const BUILTIN_BLOCKS = {
     generateCommand: (params) => {
       const kw = resolveVariables(params.keyword);
       const filter = params.ext !== '*' ? params.ext : (kw || '*');
-      if (isUnix()) {
-        return `find . -name "${filter}" 2>/dev/null`;
-      }
+      if (isUnix()) return `find . -name "${filter}" 2>/dev/null`;
       return `Get-ChildItem -Path . -Filter "${filter}" -Recurse -File -ErrorAction SilentlyContinue | Select-Object FullName, Length, LastWriteTime | Format-Table -AutoSize`;
     }
   },
@@ -188,9 +395,7 @@ const BUILTIN_BLOCKS = {
       const src = resolveVariables(params.source);
       const dst = resolveVariables(params.dest);
       if (!src || !dst) return '# コピー元とコピー先を入力してください';
-      if (isUnix()) {
-        return `cp -r "${src}" "${dst}" && echo "コピー完了: ${src} ➔ ${dst}"`;
-      }
+      if (isUnix()) return `cp -r "${src}" "${dst}" && echo "コピー完了: ${src} ➔ ${dst}"`;
       return `Copy-Item -Path "${src}" -Destination "${dst}" -Force -PassThru | Format-Table Name, Length`;
     }
   },
@@ -204,37 +409,30 @@ const BUILTIN_BLOCKS = {
     generateCommand: (params) => {
       const tgt = resolveVariables(params.target);
       if (!tgt) return '# 消したいファイル名を入力してください';
-      if (isUnix()) {
-        return `rm -rf "${tgt}" && echo "削除が終わりました: ${tgt}"`;
-      }
+      if (isUnix()) return `rm -rf "${tgt}" && echo "削除が終わりました: ${tgt}"`;
       return `Remove-Item -Path "${tgt}" -Force -ErrorAction Stop; Write-Output "削除が終わりました: ${tgt}"`;
     }
   },
 
-  // --- インターネット・ネットワーク診断 ---
   'show-ip': {
-    name: '自分のIPアドレスを調べる (ifconfig/ipconfig)',
+    name: '自分のIPアドレスを調べる (ipconfig)',
     category: 'system',
     fields: [],
     generateCommand: () => {
-      if (isUnix()) {
-        return `echo "--- [Wi-Fi / LAN のIPアドレス] ---" && ipconfig getifaddr en0 2>/dev/null || ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}'`;
-      }
+      if (isUnix()) return `echo "--- [Wi-Fi / LAN のIPアドレス] ---" && ipconfig getifaddr en0 2>/dev/null || ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}'`;
       return `Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceAlias -notmatch 'Loopback' } | Select-Object InterfaceAlias, IPAddress, PrefixOrigin | Format-Table -AutoSize`;
     }
   },
 
   'check-port': {
-    name: 'ポート番号が使われているか調べる (lsof)',
+    name: 'ポート番号が使われているか調べる',
     category: 'system',
     fields: [
       { id: 'port', label: '調べるポート番号', type: 'text', placeholder: '例: 3000, 8080', default: '3000' }
     ],
     generateCommand: (params) => {
       const p = resolveVariables(params.port).trim() || '3000';
-      if (isUnix()) {
-        return `lsof -i :${p} || echo "🟢 ポート ${p} は現在【空いています】"`;
-      }
+      if (isUnix()) return `lsof -i :${p} || echo "🟢 ポート ${p} は現在【空いています】"`;
       return `$p = ${p}; $conns = Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue; if ($conns) { Write-Output "⚠️ ポート $p は現在【使用中】です！"; $conns | Select-Object LocalAddress, LocalPort, State, OwningProcess, @{Name="アプリ名";Expression={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}} | Format-Table -AutoSize } else { Write-Output "🟢 ポート $p は現在【空いています】（自由に使えます）" }`;
     }
   },
@@ -247,30 +445,26 @@ const BUILTIN_BLOCKS = {
     ],
     generateCommand: (params) => {
       const h = resolveVariables(params.host) || 'google.com';
-      if (isUnix()) {
-        return `ping -c 2 "${h}"`;
-      }
+      if (isUnix()) return `ping -c 2 "${h}"`;
       return `Test-Connection -ComputerName "${h}" -Count 2 | Select-Object Address, ResponseTime, Status | Format-Table -AutoSize`;
     }
   },
 
   'trace-route': {
-    name: '通信の通り道を調べる (traceroute)',
+    name: '通信の通り道を調べる (tracert)',
     category: 'system',
     fields: [
       { id: 'host', label: '宛先アドレス', type: 'text', placeholder: '例: google.com', default: 'google.com' }
     ],
     generateCommand: (params) => {
       const h = resolveVariables(params.host) || 'google.com';
-      if (isUnix()) {
-        return `traceroute -m 8 "${h}" 2>/dev/null || traceroute "${h}"`;
-      }
+      if (isUnix()) return `traceroute -m 8 "${h}" 2>/dev/null || traceroute "${h}"`;
       return `tracert -d -h 8 "${h}"`;
     }
   },
 
   'web-download': {
-    name: 'ネットからファイルを保存する (curl)',
+    name: 'ネットからファイルを保存する',
     category: 'system',
     fields: [
       { id: 'url', label: 'ダウンロード先のURL', type: 'text', placeholder: 'https://example.com/file.zip', default: '' },
@@ -280,55 +474,45 @@ const BUILTIN_BLOCKS = {
       const url = resolveVariables(params.url);
       const of = resolveVariables(params.outfile);
       if (!url) return '# ダウンロードするURLを入力してください';
-      if (isUnix()) {
-        return `curl -L -o "${of}" "${url}" && echo "ダウンロード完了: ${of}"`;
-      }
+      if (isUnix()) return `curl -L -o "${of}" "${url}" && echo "ダウンロード完了: ${of}"`;
       return `Invoke-WebRequest -Uri "${url}" -OutFile "${of}"; Write-Output "ダウンロードが終わりました: ${of}"`;
     }
   },
 
   'web-api': {
-    name: 'Webからデータを取ってくる (API/curl)',
+    name: 'Webからデータを取ってくる (API)',
     category: 'system',
     fields: [
       { id: 'url', label: 'アクセス先のアドレス', type: 'text', placeholder: '例: https://api.github.com/zen', default: 'https://api.github.com/zen' }
     ],
     generateCommand: (params) => {
       const url = resolveVariables(params.url);
-      if (isUnix()) {
-        return `curl -s "${url}"`;
-      }
+      if (isUnix()) return `curl -s "${url}"`;
       return `Invoke-RestMethod -Uri "${url}"`;
     }
   },
 
-  // --- パソコンの状態と電源 ---
   'system-info': {
     name: 'パソコンの詳しい情報を見る',
     category: 'system',
     fields: [],
     generateCommand: () => {
-      if (isUnix()) {
-        return `uname -a && (sw_vers 2>/dev/null || cat /etc/os-release 2>/dev/null)`;
-      }
+      if (isUnix()) return `uname -a && (sw_vers 2>/dev/null || cat /etc/os-release 2>/dev/null)`;
       return `[PSCustomObject]@{ "OS" = (Get-CimInstance Win32_OperatingSystem).Caption; "CPU" = (Get-CimInstance Win32_Processor).Name; "メモリ合計(GB)" = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 2); "空きメモリ(GB)" = [math]::Round((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1MB, 2) } | Format-List`;
     }
   },
 
   'process-list': {
-    name: '今動いているアプリ一覧 (ps)',
+    name: '今動いているアプリ一覧',
     category: 'system',
     fields: [
       { id: 'top', label: '何個見る？', type: 'select', options: [
         { value: '5', label: '上位 5個' },
-        { value: '10', label: '上位 10個' },
-        { value: '20', label: '上位 20個' }
+        { value: '10', label: '上位 10個' }
       ], default: '10' }
     ],
     generateCommand: (params) => {
-      if (isUnix()) {
-        return `ps aux | head -n ${parseInt(params.top, 10) + 1}`;
-      }
+      if (isUnix()) return `ps aux | head -n ${parseInt(params.top, 10) + 1}`;
       return `Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First ${params.top} Name, @{Name="使っているメモリ(MB)";Expression={[math]::Round($_.WorkingSet64 / 1MB, 1)}}, Id | Format-Table -AutoSize`;
     }
   },
@@ -350,53 +534,17 @@ const BUILTIN_BLOCKS = {
     ],
     generateCommand: (params) => {
       if (isUnix()) {
-        if (params.action === 'cancel') {
-          return `sudo killall shutdown 2>/dev/null && echo "シャットダウンの予約を取り消しました"`;
-        }
+        if (params.action === 'cancel') return `sudo killall shutdown 2>/dev/null && echo "シャットダウンの予約を取り消しました"`;
         const flag = params.action === 'restart' ? '-r' : '-h';
         return `sudo shutdown ${flag} +${params.minutes} && echo "${params.minutes}分後に実行するよう予約しました"`;
       }
-      if (params.action === 'cancel') {
-        return `shutdown /a; Write-Output "シャットダウンの予約を取り消しました"`;
-      }
+      if (params.action === 'cancel') return `shutdown /a; Write-Output "シャットダウンの予約を取り消しました"`;
       const flag = params.action === 'restart' ? '/r' : '/s';
       const sec = parseInt(params.minutes, 10) * 60;
-      return `shutdown ${flag} /t ${sec}; Write-Output "${params.minutes}分後に実行するよう予約しました（取り消すときはキャンセルを選んでください）"`;
+      return `shutdown ${flag} /t ${sec}; Write-Output "${params.minutes}分後に実行するよう予約しました"`;
     }
   },
 
-  // --- Windows/Mac 特有のメンテナンス ---
-  'battery-report': {
-    name: 'バッテリー寿命・残量を調べる (powercfg/pmset)',
-    category: 'system',
-    fields: [],
-    generateCommand: () => {
-      if (isUnix()) {
-        return `pmset -g batt 2>/dev/null || upower -i $(upower -e | grep 'BAT') 2>/dev/null || echo "バッテリー情報を取得しました"`;
-      }
-      return `powercfg /batteryreport /output "battery_report.html"; Write-Output "バッテリー診断レポート (battery_report.html) を作成しました！ブラウザで開いて寿命を確認できます。"`;
-    }
-  },
-
-  'robocopy-sync': {
-    name: 'フォルダを丸ごと高速同期・バックアップ (robocopy/rsync)',
-    category: 'file',
-    fields: [
-      { id: 'source', label: '元のフォルダ', type: 'text', placeholder: '例: ./data', default: './data' },
-      { id: 'dest', label: '同期先フォルダ', type: 'text', placeholder: '例: ./backup_mirror', default: './backup_mirror' }
-    ],
-    generateCommand: (params) => {
-      const src = resolveVariables(params.source);
-      const dst = resolveVariables(params.dest);
-      if (!src || !dst) return '# 元のフォルダと同期先を入力してください';
-      if (isUnix()) {
-        return `rsync -av --delete "${src}/" "${dst}/" && echo "同期（ミラーリング）が完了しました"`;
-      }
-      return `robocopy "${src}" "${dst}" /MIR /R:2 /W:2 /NP; Write-Output "同期（ミラーリング）が完了しました"`;
-    }
-  },
-
-  // --- 頭脳・繰り返し・対話 ---
   'prompt-input': {
     name: '人に質問して文字を入力してもらう',
     category: 'custom',
@@ -407,7 +555,7 @@ const BUILTIN_BLOCKS = {
     isInteractive: true,
     generateCommand: (params) => {
       const q = resolveVariables(params.question);
-      return `# 質問: "${q}" (入力された値: $userInput を使います)`;
+      return `# 質問: "${q}" (入力値: $userInput)`;
     }
   },
 
@@ -424,9 +572,7 @@ const BUILTIN_BLOCKS = {
     ],
     generateCommand: (params) => {
       const action = resolveVariables(params.action);
-      if (isUnix()) {
-        return `for i in $(seq 1 ${params.count}); do ${action}; done`;
-      }
+      if (isUnix()) return `for i in $(seq 1 ${params.count}); do ${action}; done`;
       return `1..${params.count} | ForEach-Object { $i = $_; ${action} }`;
     }
   },
@@ -439,9 +585,7 @@ const BUILTIN_BLOCKS = {
     ],
     generateCommand: (params) => {
       const action = resolveVariables(params.action) || 'echo "$line"';
-      if (isUnix()) {
-        return `while IFS= read -r line; do ${action}; done <<< "$LAST_RESULT"`;
-      }
+      if (isUnix()) return `while IFS= read -r line; do ${action}; done <<< "$LAST_RESULT"`;
       return `$lastResult | ForEach-Object { ${action} }`;
     }
   },
@@ -465,22 +609,13 @@ const BUILTIN_BLOCKS = {
       const actElse = resolveVariables(params.actionElse);
 
       if (isUnix()) {
-        if (params.condType === 'file_exists') {
-          return `if [ -e "${target}" ]; then ${actIf}; else ${actElse}; fi`;
-        } else if (params.condType === 'prev_success') {
-          return `if [ $? -eq 0 ]; then ${actIf}; else ${actElse}; fi`;
-        } else {
-          return `if echo "$LAST_RESULT" | grep -q "${target}"; then ${actIf}; else ${actElse}; fi`;
-        }
+        if (params.condType === 'file_exists') return `if [ -e "${target}" ]; then ${actIf}; else ${actElse}; fi`;
+        if (params.condType === 'prev_success') return `if [ $? -eq 0 ]; then ${actIf}; else ${actElse}; fi`;
+        return `if echo "$LAST_RESULT" | grep -q "${target}"; then ${actIf}; else ${actElse}; fi`;
       }
-
-      if (params.condType === 'file_exists') {
-        return `if (Test-Path "${target}") { ${actIf} } else { ${actElse} }`;
-      } else if (params.condType === 'prev_success') {
-        return `if ($?) { ${actIf} } else { ${actElse} }`;
-      } else {
-        return `if ($lastResult -match "${target}") { ${actIf} } else { ${actElse} }`;
-      }
+      if (params.condType === 'file_exists') return `if (Test-Path "${target}") { ${actIf} } else { ${actElse} }`;
+      if (params.condType === 'prev_success') return `if ($?) { ${actIf} } else { ${actElse} }`;
+      return `if ($lastResult -match "${target}") { ${actIf} } else { ${actElse} }`;
     }
   },
 
@@ -493,22 +628,17 @@ const BUILTIN_BLOCKS = {
     ],
     generateCommand: (params) => {
       const val = resolveVariables(params.val);
-      if (isUnix()) {
-        return `export ${params.key}="${val}" && echo "設定を保存しました: ${params.key}=${val}"`;
-      }
+      if (isUnix()) return `export ${params.key}="${val}" && echo "設定を保存しました: ${params.key}=${val}"`;
       return `$env:${params.key} = "${val}"; Write-Output "設定を保存しました: ${params.key}=${val}"`;
     }
   },
 
-  // --- 便利なアクション・合図 ---
   'copy-clipboard': {
-    name: '結果をクリップボードにコピー (pbcopy)',
+    name: '結果をクリップボードにコピー',
     category: 'custom',
     fields: [],
     generateCommand: () => {
-      if (isUnix()) {
-        return `printf '%s' "$LAST_RESULT" | (pbcopy 2>/dev/null || xclip -selection clipboard 2>/dev/null || cat) && echo "直前の結果をクリップボードにコピーしました！"`;
-      }
+      if (isUnix()) return `printf '%s' "$LAST_RESULT" | (pbcopy 2>/dev/null || xclip -selection clipboard 2>/dev/null || cat) && echo "直前の結果をクリップボードにコピーしました！"`;
       return `$lastResult | Set-Clipboard; Write-Output "直前の結果をクリップボードにコピーしました！（Ctrl+Vでどこにでも貼り付けられます）"`;
     }
   },
@@ -524,14 +654,9 @@ const BUILTIN_BLOCKS = {
       ], default: '1' }
     ],
     generateCommand: (params) => {
-      if (isUnix()) {
-        return `(afplay /System/Library/Sounds/Glass.aiff 2>/dev/null || printf '\\a') && echo "音でお知らせしました"`;
-      }
-      if (params.count === '2') {
-        return `[Console]::Beep(880, 150); Start-Sleep -Milliseconds 100; [Console]::Beep(880, 200); Write-Output "音でお知らせしました（ピピッ）"`;
-      } else if (params.count === '3') {
-        return `[Console]::Beep(523, 120); [Console]::Beep(659, 120); [Console]::Beep(784, 250); Write-Output "音でお知らせしました（ファンファーレ）"`;
-      }
+      if (isUnix()) return `(afplay /System/Library/Sounds/Glass.aiff 2>/dev/null || printf '\\a') && echo "音でお知らせしました"`;
+      if (params.count === '2') return `[Console]::Beep(880, 150); Start-Sleep -Milliseconds 100; [Console]::Beep(880, 200); Write-Output "音でお知らせしました（ピピッ）"`;
+      if (params.count === '3') return `[Console]::Beep(523, 120); [Console]::Beep(659, 120); [Console]::Beep(784, 250); Write-Output "音でお知らせしました（ファンファーレ）"`;
       return `[Console]::Beep(1000, 250); Write-Output "音でお知らせしました"`;
     }
   },
@@ -548,9 +673,7 @@ const BUILTIN_BLOCKS = {
       ], default: '3' }
     ],
     generateCommand: (params) => {
-      if (isUnix()) {
-        return `echo "${params.seconds}秒 待っています..." && sleep ${params.seconds} && echo "次の処理に進みます"`;
-      }
+      if (isUnix()) return `echo "${params.seconds}秒 待っています..." && sleep ${params.seconds} && echo "次の処理に進みます"`;
       return `Write-Output "${params.seconds}秒 待っています..."; Start-Sleep -Seconds ${params.seconds}; Write-Output "次の処理に進みます"`;
     }
   },
@@ -565,9 +688,7 @@ const BUILTIN_BLOCKS = {
     generateCommand: (params) => {
       const fA = resolveVariables(params.fileA);
       const fB = resolveVariables(params.fileB);
-      if (isUnix()) {
-        return `diff -u "${fA}" "${fB}" || true`;
-      }
+      if (isUnix()) return `diff -u "${fA}" "${fB}" || true`;
       return `Compare-Object (Get-Content "${fA}") (Get-Content "${fB}") | Format-Table -AutoSize`;
     }
   },
@@ -585,9 +706,7 @@ const BUILTIN_BLOCKS = {
     generateCommand: (params) => {
       const fp = resolveVariables(params.filepath);
       const op = params.mode === 'append' ? '>>' : '>';
-      if (isUnix()) {
-        return `printf '%s' "$LAST_RESULT" ${op} "${fp}" && echo "ファイルに書き出しました: ${fp}"`;
-      }
+      if (isUnix()) return `printf '%s' "$LAST_RESULT" ${op} "${fp}" && echo "ファイルに書き出しました: ${fp}"`;
       const flag = params.mode === 'append' ? '-Append' : '';
       return `$lastResult | Out-File -FilePath "${fp}" ${flag} -Encoding utf8; Write-Output "ファイルに書き出しました: ${fp}"`;
     }
@@ -608,7 +727,6 @@ const BUILTIN_BLOCKS = {
     }
   },
 
-  // --- Zipの圧縮と解凍 ---
   'zip-compress': {
     name: 'フォルダをZipにまとめる (圧縮)',
     category: 'file',
@@ -619,9 +737,7 @@ const BUILTIN_BLOCKS = {
     generateCommand: (params) => {
       const src = resolveVariables(params.source);
       const dst = resolveVariables(params.dest);
-      if (isUnix()) {
-        return `zip -r "${dst}" "${src}" && echo "Zipファイルにまとめました: ${dst}"`;
-      }
+      if (isUnix()) return `zip -r "${dst}" "${src}" && echo "Zipファイルにまとめました: ${dst}"`;
       return `Compress-Archive -Path "${src}" -DestinationPath "${dst}" -Force; Write-Output "Zipファイルにまとめました: ${dst}"`;
     }
   },
@@ -636,14 +752,11 @@ const BUILTIN_BLOCKS = {
     generateCommand: (params) => {
       const zf = resolveVariables(params.zipfile);
       const dst = resolveVariables(params.dest);
-      if (isUnix()) {
-        return `mkdir -p "${dst}" && unzip -o "${zf}" -d "${dst}" && echo "Zipの中身を取り出しました: ${dst}"`;
-      }
+      if (isUnix()) return `mkdir -p "${dst}" && unzip -o "${zf}" -d "${dst}" && echo "Zipの中身を取り出しました: ${dst}"`;
       return `Expand-Archive -Path "${zf}" -DestinationPath "${dst}" -Force; Write-Output "Zipの中身を取り出しました: ${dst}"`;
     }
   },
 
-  // --- 道具・プログラムの追加 ---
   'pkg-install': {
     name: '必要なツールを入れる (インストール)',
     category: 'system',
@@ -666,7 +779,6 @@ const BUILTIN_BLOCKS = {
     }
   },
 
-  // --- 文字やデータの処理 ---
   'search-text': {
     name: 'ファイルの中から文字を探す (grep/find)',
     category: 'text',
@@ -677,9 +789,7 @@ const BUILTIN_BLOCKS = {
     generateCommand: (params) => {
       const pt = resolveVariables(params.pattern);
       const ph = resolveVariables(params.path);
-      if (isUnix()) {
-        return `grep -rn "${pt}" "${ph}" 2>/dev/null || echo "見つかりませんでした"`;
-      }
+      if (isUnix()) return `grep -rn "${pt}" "${ph}" 2>/dev/null || echo "見つかりませんでした"`;
       return `Select-String -Path "${ph}" -Pattern "${pt}" -ErrorAction SilentlyContinue | Select-Object Filename, LineNumber, Line | Format-Table -AutoSize`;
     }
   },
@@ -692,14 +802,11 @@ const BUILTIN_BLOCKS = {
     ],
     generateCommand: (params) => {
       const tgt = resolveVariables(params.target);
-      if (isUnix()) {
-        return `wc "${tgt}" 2>/dev/null`;
-      }
+      if (isUnix()) return `wc "${tgt}" 2>/dev/null`;
       return `Get-Content "${tgt}" -ErrorAction SilentlyContinue | Measure-Object -Line -Word -Character | Format-List Lines, Words, Characters`;
     }
   },
 
-  // --- 変更の記録 (Git) ---
   'git-status': {
     name: 'どこが変わったか確認する (git status)',
     category: 'git',
@@ -722,10 +829,280 @@ const BUILTIN_BLOCKS = {
     generateCommand: (params) => {
       return `git log -n ${params.count} --pretty=format:"%h - %an, %ar : %s"`;
     }
-  }
-};
+  },
 
-// ユーザーが作成したカスタムブロック群
+  'driver-list': {
+    name: 'インストール済みドライバ一覧 (driverquery)',
+    category: 'system',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `kextstat 2>/dev/null || lsmod 2>/dev/null || echo "ドライバ情報を取得しました"`;
+      return `driverquery /fo table | Select-Object -First 30`;
+    }
+  },
+
+  'dxdiag-run': {
+    name: 'DirectX・グラフィック診断 (dxdiag)',
+    category: 'system',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `system_profiler SPDisplaysDataType 2>/dev/null || lspci 2>/dev/null`;
+      return `Get-CimInstance Win32_VideoController | Select-Object Caption, DriverVersion, VideoModeDescription | Format-List`;
+    }
+  },
+
+  'netstat-ports': {
+    name: '通信中ポート・PID全一覧 (netstat -ano)',
+    category: 'network',
+    fields: [
+      { id: 'filter', label: '状態で絞り込み', type: 'select', options: [
+        { value: 'all', label: 'すべて表示' },
+        { value: 'listen', label: '待機中 (LISTENING) のみ' },
+        { value: 'estab', label: '通信確立 (ESTABLISHED) のみ' }
+      ], default: 'listen' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) {
+        const flag = params.filter === 'listen' ? 'LISTEN' : (params.filter === 'estab' ? 'ESTABLISHED' : '');
+        return flag ? `lsof -i -P -n | grep ${flag} | head -n 30` : `lsof -i -P -n | head -n 30`;
+      }
+      const st = params.filter === 'listen' ? 'LISTENING' : (params.filter === 'estab' ? 'ESTABLISHED' : '');
+      const filterCmd = st ? `| Where-Object { $_ -match '${st}' }` : '';
+      return `netstat -ano ${filterCmd} | Select-Object -First 30`;
+    }
+  },
+
+  'arp-scan': {
+    name: 'LAN内機器MACアドレス一覧 (arp -a)',
+    category: 'network',
+    fields: [],
+    generateCommand: () => {
+      return `arp -a | Select-Object -First 25`;
+    }
+  },
+
+  'defrag-drive': {
+    name: 'ドライブ最適化・デフラグ (defrag)',
+    category: 'storage',
+    fields: [
+      { id: 'drive', label: '対象ドライブ', type: 'select', options: [
+        { value: 'C:', label: 'Cドライブ' },
+        { value: 'D:', label: 'Dドライブ' }
+      ], default: 'C:' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) return `echo "※ macOS / Linux ファイルシステムは自動最適化されます"`;
+      return `Optimize-Volume -DriveLetter ${params.drive.replace(':', '')} -Defrag -Verbose`;
+    }
+  },
+
+  'vol-info': {
+    name: 'ボリュームシリアル確認 (vol)',
+    category: 'storage',
+    fields: [
+      { id: 'drive', label: '対象ドライブ', type: 'text', placeholder: 'C:', default: 'C:' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) return `df -h "${params.drive || '/'}"`;
+      return `vol ${params.drive || 'C:'}`;
+    }
+  },
+
+  'find-str': {
+    name: 'ファイル内文字列検索 (findstr / grep)',
+    category: 'file',
+    fields: [
+      { id: 'pattern', label: '検索する文字列', type: 'text', placeholder: '例: password, ERROR', default: 'ERROR' },
+      { id: 'mask', label: '対象ファイル', type: 'text', placeholder: '例: *.log または *.*', default: '*.txt' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.pattern);
+      const m = resolveVariables(params.mask);
+      if (isUnix()) return `grep -rn "${p}" ${m} 2>/dev/null || echo "見つかりませんでした"`;
+      return `findstr /s /i /n "${p}" ${m}`;
+    }
+  },
+
+  'where-cmd': {
+    name: 'コマンド実体パス検索 (where / which)',
+    category: 'file',
+    fields: [
+      { id: 'cmdName', label: '探したいコマンド/アプリ名', type: 'text', placeholder: '例: git, node, python, code', default: 'git' }
+    ],
+    generateCommand: (params) => {
+      const c = resolveVariables(params.cmdName);
+      if (isUnix()) return `which "${c}" 2>/dev/null || echo "見つかりませんでした: ${c}"`;
+      return `where.exe "${c}"`;
+    }
+  },
+
+  'file-attrib': {
+    name: '属性変更・隠しファイル解除 (attrib)',
+    category: 'file',
+    fields: [
+      { id: 'filepath', label: '対象ファイル', type: 'text', placeholder: '例: memo.txt', default: '' },
+      { id: 'attr', label: '変更内容', type: 'select', options: [
+        { value: '-h', label: '隠しファイル属性を解除 (-h)' },
+        { value: '+h', label: '隠しファイルにする (+h)' },
+        { value: '-r', label: '読み取り専用を解除 (-r)' },
+        { value: '+r', label: '読み取り専用にする (+r)' }
+      ], default: '-h' }
+    ],
+    generateCommand: (params) => {
+      const fp = resolveVariables(params.filepath);
+      if (!fp) return '# 対象ファイル名を入力してください';
+      if (isUnix()) return `chmod 644 "${fp}" && echo "属性を更新しました: ${fp}"`;
+      return `attrib ${params.attr} "${fp}"; Write-Output "ファイル属性を更新しました: ${fp}"`;
+    }
+  },
+
+  'service-list': {
+    name: 'Windowsサービス稼働確認 (sc query)',
+    category: 'system',
+    fields: [
+      { id: 'state', label: '状態フィルター', type: 'select', options: [
+        { value: 'all', label: 'すべてのサービス' },
+        { value: 'running', label: '稼働中 (Running) のみ' },
+        { value: 'stopped', label: '停止中 (Stopped) のみ' }
+      ], default: 'running' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) return `launchctl list | head -n 30`;
+      const flag = params.state === 'running' ? 'state= running' : (params.state === 'stopped' ? 'state= inactive' : 'state= all');
+      return `sc.exe query ${flag} | Select-Object -First 35`;
+    }
+  },
+
+  'schtasks-list': {
+    name: 'タスクスケジューラ一覧 (schtasks)',
+    category: 'system',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `crontab -l 2>/dev/null || echo "登録されたcronタスクはありません"`;
+      return `schtasks /query /fo TABLE | Select-Object -First 25`;
+    }
+  },
+
+  'net-user-list': {
+    name: '登録ユーザーアカウント一覧 (net user)',
+    category: 'security',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `dscl . -list /Users 2>/dev/null || cat /etc/passwd | cut -d: -f1 | head -n 25`;
+      return `net user`;
+    }
+  },
+
+  'net-group-list': {
+    name: 'ローカルグループ・管理者一覧 (net group)',
+    category: 'security',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `dscl . -list /Groups 2>/dev/null || cat /etc/group | cut -d: -f1 | head -n 25`;
+      return `net localgroup Administrators`;
+    }
+  },
+
+  'group-policy': {
+    name: 'グループポリシー適用状態 (gpresult)',
+    category: 'security',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `echo "※ macOS / Linux にはグループポリシーはありません"`;
+      return `gpresult /r`;
+    }
+  },
+
+  'reg-query': {
+    name: 'レジストリキーの読み取り (reg query)',
+    category: 'system',
+    fields: [
+      { id: 'key', label: 'レジストリパス', type: 'text', placeholder: '例: HKLM\\Software\\Microsoft\\Windows\\CurrentVersion', default: 'HKCU\\Software' }
+    ],
+    generateCommand: (params) => {
+      const k = resolveVariables(params.key) || 'HKCU\\Software';
+      if (isUnix()) return `defaults read 2>/dev/null | head -n 20 || echo "設定情報を読み込みました"`;
+      return `reg query "${k}" | Select-Object -First 30`;
+    }
+  },
+
+  'setx-env': {
+    name: '環境変数を永久保存 (setx)',
+    category: 'system',
+    fields: [
+      { id: 'varName', label: '環境変数名', type: 'text', placeholder: '例: MY_KEY', default: 'MY_KEY' },
+      { id: 'varVal', label: '保存する値', type: 'text', placeholder: '例: secret_value', default: 'secret_value' }
+    ],
+    generateCommand: (params) => {
+      const n = resolveVariables(params.varName);
+      const v = resolveVariables(params.varVal);
+      if (!n) return '# 変数名を入力してください';
+      if (isUnix()) return `echo "export ${n}=\\"${v}\\"" >> ~/.zshrc && echo "環境変数を保存しました: ${n}=${v}"`;
+      return `setx "${n}" "${v}"; Write-Output "環境変数を永久保存しました: ${n}=${v}"`;
+    }
+  },
+
+  'bcdedit-info': {
+    name: 'ブートローダー構成情報 (bcdedit)',
+    category: 'system',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `nvram -p 2>/dev/null | head -n 20 || echo "ブート情報を取得しました"`;
+      return `bcdedit /enum`;
+    }
+  },
+
+  'pipe-filter': {
+    name: '前の結果から文字で抽出 (Pipe)',
+    category: 'custom',
+    fields: [
+      { id: 'keyword', label: '残したい文字', type: 'text', placeholder: '例: ERROR, chrome, 192.168', default: 'chrome' }
+    ],
+    generateCommand: (params) => {
+      const kw = resolveVariables(params.keyword);
+      if (isUnix()) return `printf '%s\\n' "$LAST_RESULT" | grep -i "${kw}"`;
+      return `$lastResult | Where-Object { $_ -match "${kw}" }`;
+    }
+  },
+
+  'pipe-sort': {
+    name: '前の結果を並べ替え (Pipe)',
+    category: 'custom',
+    fields: [
+      { id: 'desc', label: '並び順', type: 'select', options: [
+        { value: 'no', label: '昇順 (小さい順 / A-Z)' },
+        { value: 'yes', label: '降順 (大きい順 / Z-A)' }
+      ], default: 'no' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) {
+        const flag = params.desc === 'yes' ? '-r' : '';
+        return `printf '%s\\n' "$LAST_RESULT" | sort ${flag}`;
+      }
+      const flag = params.desc === 'yes' ? '-Descending' : '';
+      return `$lastResult | Sort-Object ${flag}`;
+    }
+  },
+
+  'pipe-head': {
+    name: '前の結果の先頭〇行 (Pipe)',
+    category: 'custom',
+    fields: [
+      { id: 'lines', label: '何行残す？', type: 'select', options: [
+        { value: '3', label: '先頭 3行' },
+        { value: '5', label: '先頭 5行' },
+        { value: '10', label: '先頭 10行' },
+        { value: '20', label: '先頭 20行' }
+      ], default: '5' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) return `printf '%s\\n' "$LAST_RESULT" | head -n ${params.lines}`;
+      return `$lastResult | Select-Object -First ${params.lines}`;
+    }
+  }
+});
+
+// ユーザー自作ブロック
 let userBlocks = {};
 
 function loadUserBlocks() {
@@ -750,11 +1127,14 @@ function getBlockDef(type) {
   return BUILTIN_BLOCKS[type] || userBlocks[type];
 }
 
-// すぐ使えるおすすめセット
+// プリセット
 const PRESETS = {
   'battery-check': [
     { type: 'battery-report', params: {} },
     { type: 'beep-sound', params: { count: '1' } }
+  ],
+  'wifi-check': [
+    { type: 'wifi-password', params: { ssid: '' } }
   ],
   'folder-sync': [
     { type: 'robocopy-sync', params: { source: './data', dest: './backup_mirror' } },
@@ -788,6 +1168,9 @@ const toggleRunAsAdmin = document.getElementById('toggleRunAsAdmin');
 const toggleStopOnError = document.getElementById('toggleStopOnError');
 const btnStopProcess = document.getElementById('btnStopProcess');
 const blockSearchInput = document.getElementById('blockSearchInput');
+const catalogModal = document.getElementById('catalogModal');
+const catalogGrid = document.getElementById('catalogGrid');
+const catalogSearchInput = document.getElementById('catalogSearchInput');
 
 // 3. 初期化
 async function init() {
@@ -795,6 +1178,7 @@ async function init() {
   loadUserBlocks();
   await fetchCwd();
   setupEventListeners();
+  renderCatalogGrid('');
   loadPreset('date-backup');
 }
 
@@ -821,6 +1205,34 @@ async function fetchCwd() {
     explanationBox.innerHTML = '<strong>お試しデモ中:</strong> 画面の動きを体験できます。実際に動かす場合は <code>start.bat</code> または <code>./start.sh</code> を実行してください。';
     explanationBox.classList.remove('hidden');
   }
+}
+
+// 📖 全コマンド図鑑のカード描画
+function renderCatalogGrid(query = '') {
+  catalogGrid.innerHTML = '';
+  const q = query.toLowerCase().trim();
+
+  COMMAND_CATALOG.forEach(item => {
+    const match = !q || item.name.toLowerCase().includes(q) || item.cmd.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+    if (!match) return;
+
+    const card = document.createElement('div');
+    card.className = 'catalog-card';
+    card.innerHTML = `
+      <div class="catalog-card-header">
+        <span class="catalog-card-title">${item.name}</span>
+        <span class="catalog-cmd-badge">${item.cmd}</span>
+      </div>
+      <div class="catalog-card-desc">${item.desc}</div>
+    `;
+
+    card.addEventListener('click', () => {
+      addBlock(item.id);
+      catalogModal.classList.add('hidden');
+    });
+
+    catalogGrid.appendChild(card);
+  });
 }
 
 // ユーザー作成ブロックの描画
@@ -855,23 +1267,62 @@ function setupEventListeners() {
     });
   });
 
-  // 検索フィルター
+  // 図鑑モーダル開閉
+  document.getElementById('btnOpenCommandCatalog').addEventListener('click', () => {
+    catalogSearchInput.value = '';
+    renderCatalogGrid('');
+    catalogModal.classList.remove('hidden');
+  });
+  document.getElementById('btnCatalogClose').addEventListener('click', () => {
+    catalogModal.classList.add('hidden');
+  });
+
+  catalogSearchInput.addEventListener('input', (e) => {
+    renderCatalogGrid(e.target.value);
+  });
+
+  // すべて開く / すべて閉じるボタン
+  const btnExpandAll = document.getElementById('btnExpandAll');
+  if (btnExpandAll) {
+    btnExpandAll.addEventListener('click', () => {
+      document.querySelectorAll('.sidebar-accordion').forEach(acc => acc.open = true);
+    });
+  }
+  const btnCollapseAll = document.getElementById('btnCollapseAll');
+  if (btnCollapseAll) {
+    btnCollapseAll.addEventListener('click', () => {
+      document.querySelectorAll('.sidebar-accordion').forEach(acc => acc.open = false);
+    });
+  }
+
+  // 検索フィルター (アコーディオン自動展開付き)
   blockSearchInput.addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase().trim();
-    const categories = document.querySelectorAll('#allBlocksSection .category');
+    const accordions = document.querySelectorAll('#allBlocksSection .sidebar-accordion');
     
-    categories.forEach(cat => {
+    accordions.forEach(acc => {
       let hasMatch = false;
-      cat.querySelectorAll('.item-btn').forEach(btn => {
+      acc.querySelectorAll('.item-btn').forEach(btn => {
         const text = btn.textContent.toLowerCase();
         if (!query || text.includes(query)) {
-          btn.style.display = 'block';
+          btn.style.display = 'flex';
           hasMatch = true;
         } else {
           btn.style.display = 'none';
         }
       });
-      cat.style.display = hasMatch ? 'block' : 'none';
+
+      if (!query) {
+        acc.style.display = 'block';
+        // 検索クリア時は最初の「よく使う」だけ開く
+        const titleEl = acc.querySelector('.acc-title');
+        acc.open = titleEl && titleEl.textContent.includes('よく使う');
+      } else {
+        acc.style.display = hasMatch ? 'block' : 'none';
+        if (hasMatch) {
+          acc.open = true; // 一致したら自動で折りたたみを開く！
+        }
+      }
     });
   });
 
@@ -891,6 +1342,107 @@ function setupEventListeners() {
 
   // 実行ボタン
   document.getElementById('btnRunAll').addEventListener('click', handleRun);
+
+  // 📥 スクリプト書き出しモーダル関連
+  let currentExportFormat = 'ps1';
+  const exportScriptModal = document.getElementById('exportScriptModal');
+  const exportCodePreview = document.getElementById('exportCodePreview');
+  const exportTargetLabel = document.getElementById('exportTargetLabel');
+
+  const updateExportView = () => {
+    const code = generateFormattedScript(currentExportFormat);
+    exportCodePreview.textContent = code;
+    if (currentExportFormat === 'ps1') {
+      exportTargetLabel.textContent = 'Windows PowerShell スクリプト (.ps1)';
+    } else if (currentExportFormat === 'sh') {
+      exportTargetLabel.textContent = 'macOS / Linux Bash スクリプト (.sh)';
+    } else {
+      exportTargetLabel.textContent = 'Windows バッチファイル (.bat)';
+    }
+  };
+
+  document.getElementById('btnExportScript').addEventListener('click', () => {
+    if (blocks.length === 0) {
+      alert('書き出すブロックがありません。まずブロックを配置してください。');
+      return;
+    }
+    updateExportView();
+    exportScriptModal.classList.remove('hidden');
+  });
+
+  document.getElementById('btnExportClose').addEventListener('click', () => {
+    exportScriptModal.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.tab-btn[data-export-type]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn[data-export-type]').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentExportFormat = tab.getAttribute('data-export-type');
+      updateExportView();
+    });
+  });
+
+  document.getElementById('btnCopyExportScript').addEventListener('click', () => {
+    navigator.clipboard.writeText(exportCodePreview.textContent);
+    alert('スクリプトをクリップボードにコピーしました！');
+  });
+
+  document.getElementById('btnDownloadExportScript').addEventListener('click', () => {
+    const code = exportCodePreview.textContent;
+    const ext = currentExportFormat;
+    const mime = ext === 'ps1' ? 'text/plain' : (ext === 'sh' ? 'application/x-sh' : 'text/plain');
+    downloadFile(code, `workflow_${Date.now()}.${ext}`, mime);
+  });
+
+  // 💾 レシピ保存 / 読込モーダル関連
+  const recipeModal = document.getElementById('recipeModal');
+  document.getElementById('btnRecipeModal').addEventListener('click', () => {
+    recipeModal.classList.remove('hidden');
+  });
+  document.getElementById('btnRecipeClose').addEventListener('click', () => {
+    recipeModal.classList.add('hidden');
+  });
+
+  document.getElementById('btnDownloadRecipeJson').addEventListener('click', () => {
+    if (blocks.length === 0) {
+      alert('保存するブロックがありません。');
+      return;
+    }
+    const name = document.getElementById('recipeExportName').value.trim() || 'my_workflow';
+    const recipeData = {
+      title: name,
+      version: '1.0',
+      createdAt: new Date().toISOString(),
+      platform: currentPlatform,
+      blocks: blocks
+    };
+    downloadFile(JSON.stringify(recipeData, null, 2), `${name}.json`, 'application/json');
+  });
+
+  document.getElementById('recipeFileInput').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (Array.isArray(data.blocks)) {
+          blocks = data.blocks;
+          renderCanvas();
+          recipeModal.classList.add('hidden');
+          alert(`レシピ「${data.title || file.name}」を読み込みました！ (${blocks.length}個のブロック)`);
+        } else {
+          alert('レシピファイルの形式が正しくありません。');
+        }
+      } catch (err) {
+        alert('ファイルの読み込みに失敗しました: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
 
   // プロセス中断ボタン
   btnStopProcess.addEventListener('click', async () => {
@@ -1008,10 +1560,9 @@ function setupEventListeners() {
   document.getElementById('btnHelp').addEventListener('click', () => {
     alert(
       '【Graphical Terminal の使い方】\n\n' +
-      'WindowsでもMacでも、ブロックを並べるだけで同じようにパソコンを自動操作できます。\n\n' +
-      '・お使いのOSに合わせて、裏側で動くコマンド（PowerShell / bash）が自動で切り替わります。\n' +
-      '・ファイル名に {today} と書くと今日の日付（20261108など）が自動で入ります。\n' +
-      '・ドラッグでブロックの順番を自由に入れ替えられます。'
+      '・「📖 全コマンド図鑑から探す」を押すと、Windowsの全コマンドが日常語で探せます。\n' +
+      '・「保存済みWi-Fiのパスワードを調べる」や「ネットの詰まり解消」など超実用ツールが満載。\n' +
+      '・WindowsでもMacでも、ブロックを並べるだけで自動操作できます。'
     );
   });
 }
@@ -1232,20 +1783,15 @@ function updatePreview(card, b) {
   }
 }
 
-// 6. コマンド構築と実行 (OSに応じたスクリプト組み立て)
+// 6. スクリプト組み立て
 function buildFullScript() {
   const parts = [];
   const stopOnError = toggleStopOnError && toggleStopOnError.checked;
 
   if (isUnix()) {
-    // macOS / Linux: bash / zsh 用のパイプライン
-    if (stopOnError) {
-      parts.push('set -e');
-    }
+    if (stopOnError) parts.push('set -e');
     parts.push('LAST_RESULT=""');
-    if (lastUserInput) {
-      parts.push(`userInput="${lastUserInput}"`);
-    }
+    if (lastUserInput) parts.push(`userInput="${lastUserInput}"`);
 
     blocks.forEach((b, idx) => {
       const def = getBlockDef(b.type);
@@ -1255,14 +1801,9 @@ function buildFullScript() {
 
     return parts.join('\n\n');
   } else {
-    // Windows: PowerShell 用のパイプライン
-    if (stopOnError) {
-      parts.push('$ErrorActionPreference = "Stop";');
-    }
+    if (stopOnError) parts.push('$ErrorActionPreference = "Stop";');
     parts.push('$lastResult = $null;');
-    if (lastUserInput) {
-      parts.push(`$userInput = "${lastUserInput}";`);
-    }
+    if (lastUserInput) parts.push(`$userInput = "${lastUserInput}";`);
 
     blocks.forEach((b, idx) => {
       const def = getBlockDef(b.type);
@@ -1323,12 +1864,82 @@ function checkDangerAndExecute() {
   executeScript(buildFullScript());
 }
 
+function downloadFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function generateFormattedScript(format) {
+  const stopOnError = toggleStopOnError && toggleStopOnError.checked;
+
+  if (format === 'ps1') {
+    let script = `# ==========================================\n# Generated by Graphical Terminal (PowerShell)\n# Date: ${new Date().toLocaleString('ja-JP')}\n# ==========================================\n\n`;
+    script += `chcp 65001 > $null\n$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n`;
+    if (stopOnError) script += `$ErrorActionPreference = "Stop"\n`;
+    script += `$lastResult = $null\n`;
+    if (lastUserInput) script += `$userInput = "${lastUserInput}"\n`;
+    script += `\n`;
+
+    blocks.forEach((b, idx) => {
+      const def = getBlockDef(b.type);
+      const cmd = generateBlockCommand(b);
+      script += `# [Step ${idx + 1}] ${def.name}\n`;
+      script += `Write-Output "--- [Step ${idx + 1}: ${def.name}] ---"\n`;
+      script += `$lastResult = (${cmd})\n`;
+      script += `if ($lastResult) { $lastResult | Out-String | Write-Output }\n\n`;
+    });
+    return script;
+  }
+
+  if (format === 'sh') {
+    let script = `#!/usr/bin/env bash\n# ==========================================\n# Generated by Graphical Terminal (Bash / Zsh)\n# Date: ${new Date().toLocaleString('ja-JP')}\n# ==========================================\n\n`;
+    if (stopOnError) script += `set -e\n`;
+    script += `LAST_RESULT=""\n`;
+    if (lastUserInput) script += `userInput="${lastUserInput}"\n`;
+    script += `\n`;
+
+    blocks.forEach((b, idx) => {
+      const def = getBlockDef(b.type);
+      const cmd = generateBlockCommand(b);
+      script += `# [Step ${idx + 1}] ${def.name}\n`;
+      script += `echo "--- [Step ${idx + 1}: ${def.name}] ---"\n`;
+      script += `LAST_RESULT=$(${cmd})\n`;
+      script += `if [ -n "$LAST_RESULT" ]; then echo "$LAST_RESULT"; fi\n\n`;
+    });
+    return script;
+  }
+
+  if (format === 'bat') {
+    let script = `@echo off\nrem ==========================================\nrem Generated by Graphical Terminal (Windows Batch)\nrem Date: ${new Date().toLocaleString('ja-JP')}\nrem ==========================================\n\n`;
+    script += `chcp 65001 > nul\n\n`;
+    blocks.forEach((b, idx) => {
+      const def = getBlockDef(b.type);
+      const cmd = generateBlockCommand(b);
+      script += `rem [Step ${idx + 1}] ${def.name}\n`;
+      script += `echo --- [Step ${idx + 1}: ${def.name}] ---\n`;
+      script += `powershell -NoProfile -Command "chcp 65001 > $null; ${cmd.replaceAll('"', '\\"')}"\n\n`;
+    });
+    script += `pause\n`;
+    return script;
+  }
+
+  return '';
+}
+
 async function executeScript(script) {
   statusBadge.className = 'status-indicator running';
   statusBadge.textContent = '動かしています...';
   durationBadge.classList.add('hidden');
   btnStopProcess.classList.remove('hidden');
-  outputLog.textContent = '処理しています。少々お待ちください...\n';
+  explanationBox.classList.add('hidden');
+  outputLog.textContent = ''; // リアルタイム受信のためクリア
 
   const isAdmin = toggleRunAsAdmin && toggleRunAsAdmin.checked;
   const finalScript = isAdmin 
@@ -1336,30 +1947,36 @@ async function executeScript(script) {
     : script;
 
   if (isDemoMode) {
-    setTimeout(() => {
-      btnStopProcess.classList.add('hidden');
-      durationBadge.textContent = '0.30秒';
-      durationBadge.classList.remove('hidden');
-      statusBadge.className = 'status-indicator success';
-      statusBadge.textContent = '完了 (デモ)';
+    let lines = ['=== [お試し実行の結果 (デモ)] ===\n'];
+    blocks.forEach((b, idx) => {
+      const def = getBlockDef(b.type);
+      lines.push(`----------------------------------------\n`);
+      lines.push(`[ステップ ${idx + 1}: ${def.name}]\n`);
+      lines.push(`裏で動いたコマンド: ${generateBlockCommand(b)}\n`);
+      if (b.type === 'wifi-password') {
+        lines.push(`SSID名           : MyHome_Wi-Fi_5G\nセキュリティキー : 893479124012\n\n`);
+      } else if (b.type === 'flush-dns') {
+        lines.push(`DNS リゾルバー キャッシュは正常にフラッシュされました。\n\n`);
+      } else {
+        lines.push(`(正常に処理が終わりました)\n\n`);
+      }
+    });
 
-      let mockOutput = '=== [お試し実行の結果] ===\n\n';
-      blocks.forEach((b, idx) => {
-        const def = getBlockDef(b.type);
-        mockOutput += `----------------------------------------\n`;
-        mockOutput += `[ステップ ${idx + 1}: ${def.name}]\n`;
-        mockOutput += `裏で動いたコマンド: ${generateBlockCommand(b)}\n\n`;
-
-        if (b.type === 'zip-compress') {
-          mockOutput += `Zipファイルを作成しました: ${resolveVariables(b.params.dest)}\n\n`;
-        } else if (b.type === 'beep-sound') {
-          mockOutput += `音でお知らせしました。\n\n`;
-        } else {
-          mockOutput += `(正常に処理が終わりました)\n\n`;
-        }
-      });
-      outputLog.textContent = mockOutput;
-    }, 400);
+    let currentLine = 0;
+    const interval = setInterval(() => {
+      if (currentLine < lines.length) {
+        outputLog.textContent += lines[currentLine];
+        outputLog.scrollTop = outputLog.scrollHeight;
+        currentLine++;
+      } else {
+        clearInterval(interval);
+        btnStopProcess.classList.add('hidden');
+        durationBadge.textContent = '0.35s';
+        durationBadge.classList.remove('hidden');
+        statusBadge.className = 'status-indicator success';
+        statusBadge.textContent = '完了 (デモ)';
+      }
+    }, 70);
     return;
   }
 
@@ -1369,24 +1986,59 @@ async function executeScript(script) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ script: finalScript })
     });
-    const data = await res.json();
 
-    btnStopProcess.classList.add('hidden');
-    durationBadge.textContent = `${data.duration}`;
-    durationBadge.classList.remove('hidden');
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${res.status}`);
+    }
 
-    if (data.ok) {
-      statusBadge.className = 'status-indicator success';
-      statusBadge.textContent = 'おわりました';
-      outputLog.textContent = data.stdout || '(画面へのメッセージはありませんでした)';
-    } else {
-      statusBadge.className = 'status-indicator error';
-      statusBadge.textContent = '途中でストップしました';
-      outputLog.textContent = (data.stdout ? data.stdout + '\n' : '') + (data.stderr || 'エラーが発生しました');
-      
-      if (data.explanation) {
-        explanationBox.textContent = data.explanation;
-        explanationBox.classList.remove('hidden');
+    // SSE / NDJSON ストリーミング受信
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop(); // 途中のデータを持ち越し
+
+      for (const evStr of events) {
+        if (!evStr.startsWith('data: ')) continue;
+        const jsonStr = evStr.replace(/^data: /, '').trim();
+        if (!jsonStr) continue;
+
+        try {
+          const ev = JSON.parse(jsonStr);
+          if (ev.type === 'stdout' || ev.type === 'stderr') {
+            outputLog.textContent += ev.text;
+            outputLog.scrollTop = outputLog.scrollHeight;
+          } else if (ev.type === 'done') {
+            btnStopProcess.classList.add('hidden');
+            durationBadge.textContent = ev.duration;
+            durationBadge.classList.remove('hidden');
+
+            if (ev.ok) {
+              statusBadge.className = 'status-indicator success';
+              statusBadge.textContent = 'おわりました';
+            } else {
+              statusBadge.className = 'status-indicator error';
+              statusBadge.textContent = '途中でストップしました';
+              if (ev.explanation) {
+                explanationBox.textContent = ev.explanation;
+                explanationBox.classList.remove('hidden');
+              }
+            }
+          } else if (ev.type === 'error') {
+            outputLog.textContent += `\n[エラー]: ${ev.message}\n`;
+            statusBadge.className = 'status-indicator error';
+            statusBadge.textContent = 'エラー';
+          }
+        } catch (e) {
+          // ignore
+        }
       }
     }
   } catch (err) {

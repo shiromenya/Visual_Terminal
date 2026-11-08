@@ -108,7 +108,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // コマンド実行 (Windows: PowerShell / Mac・Linux: bash/zsh)
+  // コマンド実行 (ストリーミング対応 SSE / NDJSON)
   if (url.pathname === '/api/execute' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
@@ -122,6 +122,17 @@ const server = http.createServer((req, res) => {
         }
 
         const startTime = Date.now();
+
+        // リアルタイム・ストリーミング用のヘッダー
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        });
+
+        const sendEvent = (obj) => {
+          res.write(`data: ${JSON.stringify(obj)}\n\n`);
+        };
 
         if (isWindows) {
           // Windows: PowerShell (UTF-8)
@@ -139,38 +150,42 @@ const server = http.createServer((req, res) => {
           });
         }
 
-        let stdout = '';
-        let stderr = '';
+        let fullStderr = '';
 
         activeProcess.stdout.on('data', data => {
-          stdout += data.toString('utf8');
+          const text = data.toString('utf8');
+          sendEvent({ type: 'stdout', text });
         });
 
         activeProcess.stderr.on('data', data => {
-          stderr += data.toString('utf8');
+          const text = data.toString('utf8');
+          fullStderr += text;
+          sendEvent({ type: 'stderr', text });
         });
 
         activeProcess.on('close', code => {
           activeProcess = null;
           const duration = ((Date.now() - startTime) / 1000).toFixed(2);
           const exitCode = code === null ? 1 : code;
-          const explanation = explainError(stderr, exitCode);
+          const explanation = explainError(fullStderr, exitCode);
 
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
+          sendEvent({
+            type: 'done',
             ok: exitCode === 0,
-            stdout: stdout || '',
-            stderr: stderr || '',
             exitCode,
             duration: `${duration}s`,
             explanation
-          }));
+          });
+          res.end();
         });
 
         activeProcess.on('error', err => {
           activeProcess = null;
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: false, error: err.message }));
+          sendEvent({
+            type: 'error',
+            message: err.message
+          });
+          res.end();
         });
 
       } catch (err) {
