@@ -24,8 +24,19 @@
         </div>
       </div>
       <div class="toolbar-group">
-        <button id="btnOpenCommandCatalog" class="btn btn-catalog">📖 全コマンド図鑑から探す</button>
+        <button id="btnOpenCommandCatalog" class="btn btn-catalog">
+          <svg class="ui-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span>全コマンド図鑑</span>
+        </button>
         <button id="btnOpenCreateBlock" class="btn btn-default">+ 自作ブロック</button>
+        <button id="btnSecretsModal" class="btn btn-default" title="APIキーや共通変数の管理">
+          <svg class="ui-icon" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"></circle><path d="M10.7 12.3L21 2l2 2-2 2 1 1-2 2 1 1-3.3 3.3"></path></svg>
+          <span>変数管理</span>
+        </button>
+        <button id="btnHistoryModal" class="btn btn-default" title="過去の実行履歴を確認">
+          <svg class="ui-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>履歴</span>
+        </button>
         <div class="divider"></div>
         <label class="checkbox-label" title="途中で失敗したらそれ以降のブロックを動かさず安全に止めます">
           <input type="checkbox" id="toggleStopOnError" checked>
@@ -42,6 +53,11 @@
           <span>裏で動くコマンドを見る</span>
         </label>
         <button id="btnHelp" class="btn btn-subtle">使い方</button>
+        <div class="divider"></div>
+        <button id="btnThemeToggle" class="btn btn-theme" title="ダークモード / ライトモードを切り替えます">
+          <span id="themeIcon"><svg class="ui-icon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
+          <span id="themeText">ダーク</span>
+        </button>
       </div>
     </header>
 
@@ -68,7 +84,7 @@
           <summary>
             <div class="acc-header">
               <span class="acc-chevron">▶</span>
-              <span class="acc-title">⭐ すぐ使えるおすすめセット</span>
+              <span class="acc-title">おすすめレシピ</span>
             </div>
             <span class="acc-count">4</span>
           </summary>
@@ -100,7 +116,7 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">⚡ よく使う基本操作</span>
+                <span class="acc-title">よく使う基本操作</span>
               </div>
               <span class="acc-count">8</span>
             </summary>
@@ -145,18 +161,74 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">💻 システム・診断・修復</span>
+                <span class="acc-title">システム・診断・修復</span>
               </div>
-              <span class="acc-count">6</span>
+              <span class="acc-count">21</span>
             </summary>
             <div class="acc-content">
               <button class="item-btn" data-type="sys-repair">
                 <span class="item-label">壊れたシステムファイルを修復</span>
                 <span class="item-cmd">sfc</span>
               </button>
+              <button class="item-btn" data-type="dism-repair">
+                <span class="item-label">Windowsイメージ整合性修復</span>
+                <span class="item-cmd">dism</span>
+              </button>
               <button class="item-btn" data-type="disk-check">
                 <span class="item-label">ドライブの故障・エラー検査</span>
                 <span class="item-cmd">chkdsk</span>
+              </button>
+              <button class="item-btn" data-type="typeperf-monitor">
+                <span class="item-label">CPU・メモリ負荷のリアルタイム計測</span>
+                <span class="item-cmd">typeperf</span>
+              </button>
+              <button class="item-btn" data-type="open-resmon">
+                <span class="item-label">リソースモニター画面を開く</span>
+                <span class="item-cmd">resmon</span>
+              </button>
+              <button class="item-btn" data-type="open-devmgmt">
+                <span class="item-label">デバイスマネージャーを開く</span>
+                <span class="item-cmd">devmgmt</span>
+              </button>
+              <button class="item-btn" data-type="open-eventvwr">
+                <span class="item-label">イベントビューアーを開く</span>
+                <span class="item-cmd">eventvwr</span>
+              </button>
+              <button class="item-btn" data-type="open-msconfig">
+                <span class="item-label">システム構成(ブート)を開く</span>
+                <span class="item-cmd">msconfig</span>
+              </button>
+              <button class="item-btn" data-type="audit-policy">
+                <span class="item-label">セキュリティ監査ポリシー確認</span>
+                <span class="item-cmd">auditpol</span>
+              </button>
+              <button class="item-btn" data-type="bios-serial">
+                <span class="item-label">PCのシリアル番号・製造番号</span>
+                <span class="item-cmd">wmic bios</span>
+              </button>
+              <button class="item-btn" data-type="installed-apps">
+                <span class="item-label">インストール済みソフト一覧</span>
+                <span class="item-cmd">Get-Uninstall</span>
+              </button>
+              <button class="item-btn" data-type="hotfix-list">
+                <span class="item-label">Windows Update更新履歴</span>
+                <span class="item-cmd">Get-HotFix</span>
+              </button>
+              <button class="item-btn" data-type="printer-list">
+                <span class="item-label">プリンター一覧・印刷状態</span>
+                <span class="item-cmd">Get-Printer</span>
+              </button>
+              <button class="item-btn" data-type="wevtutil-errors">
+                <span class="item-label">エラー・フリーズ原因を調査</span>
+                <span class="item-cmd">wevtutil</span>
+              </button>
+              <button class="item-btn" data-type="wmic-hardware">
+                <span class="item-label">CPU・メモリの正確な型番を見る</span>
+                <span class="item-cmd">wmic / cim</span>
+              </button>
+              <button class="item-btn" data-type="assoc-ext">
+                <span class="item-label">ファイルが開くアプリ関連付け</span>
+                <span class="item-cmd">assoc</span>
               </button>
               <button class="item-btn" data-type="system-info">
                 <span class="item-label">OS・ハードウェア詳細情報</span>
@@ -174,6 +246,10 @@
                 <span class="item-label">DirectX・グラフィック診断</span>
                 <span class="item-cmd">dxdiag</span>
               </button>
+              <button class="item-btn item-danger" data-type="boot-repair">
+                <span class="item-label">[危険] ブートセクター修復 (起動トラブル用)</span>
+                <span class="item-cmd">bootrec</span>
+              </button>
             </div>
           </details>
 
@@ -182,14 +258,30 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">🌐 ネットワーク・通信</span>
+                <span class="acc-title">ネットワーク・通信</span>
               </div>
-              <span class="acc-count">9</span>
+              <span class="acc-count">15</span>
             </summary>
             <div class="acc-content">
               <button class="item-btn" data-type="show-ip">
                 <span class="item-label">自分のIPアドレスを調べる</span>
                 <span class="item-cmd">ipconfig</span>
+              </button>
+              <button class="item-btn" data-type="net-use-share">
+                <span class="item-label">共有フォルダ(NAS)をドライブ接続</span>
+                <span class="item-cmd">net use</span>
+              </button>
+              <button class="item-btn" data-type="route-manage">
+                <span class="item-label">通信経路ルーティング設定</span>
+                <span class="item-cmd">route</span>
+              </button>
+              <button class="item-btn" data-type="nslookup-dns">
+                <span class="item-label">WebサイトのIPアドレスを調査</span>
+                <span class="item-cmd">nslookup</span>
+              </button>
+              <button class="item-btn" data-type="test-net-conn">
+                <span class="item-label">相手のポートと通信できるか調査</span>
+                <span class="item-cmd">Test-NetConn</span>
               </button>
               <button class="item-btn" data-type="flush-dns">
                 <span class="item-label">DNSキャッシュを消去</span>
@@ -215,9 +307,17 @@
                 <span class="item-label">通信経路ルーティング追跡</span>
                 <span class="item-cmd">tracert</span>
               </button>
+              <button class="item-btn" data-type="pathping-route">
+                <span class="item-label">通信の途切れ・ロス率を精密測定</span>
+                <span class="item-cmd">pathping</span>
+              </button>
               <button class="item-btn" data-type="arp-scan">
                 <span class="item-label">LAN内機器MACアドレス一覧</span>
                 <span class="item-cmd">arp -a</span>
+              </button>
+              <button class="item-btn" data-type="getmac-info">
+                <span class="item-label">PCの物理住所(MAC)を見る</span>
+                <span class="item-cmd">getmac</span>
               </button>
               <button class="item-btn" data-type="web-download">
                 <span class="item-label">WebからファイルDL</span>
@@ -231,22 +331,34 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">🗄️ ストレージ・ディスク</span>
+                <span class="acc-title">ストレージ・ディスク</span>
               </div>
-              <span class="acc-count">5</span>
+              <span class="acc-count">10</span>
             </summary>
             <div class="acc-content">
               <button class="item-btn" data-type="disk-free-space">
                 <span class="item-label">各ドライブの空き容量</span>
                 <span class="item-cmd">fsutil</span>
               </button>
+              <button class="item-btn" data-type="cleanmgr-run">
+                <span class="item-label">不要なゴミファイルを一掃</span>
+                <span class="item-cmd">cleanmgr</span>
+              </button>
+              <button class="item-btn" data-type="hardlink-create">
+                <span class="item-label">ハードリンク作成 (容量0の分身)</span>
+                <span class="item-cmd">fsutil hardlink</span>
+              </button>
+              <button class="item-btn" data-type="open-diskmgmt">
+                <span class="item-label">ディスクの管理画面を開く</span>
+                <span class="item-cmd">diskmgmt</span>
+              </button>
+              <button class="item-btn" data-type="subst-drive">
+                <span class="item-label">奥の深いフォルダを「Zドライブ」化</span>
+                <span class="item-cmd">subst</span>
+              </button>
               <button class="item-btn" data-type="compact-disk">
                 <span class="item-label">NTFSファイル圧縮で容量削減</span>
                 <span class="item-cmd">compact</span>
-              </button>
-              <button class="item-btn item-danger" data-type="cipher-wipe">
-                <span class="item-label">空き領域の完全抹消 (復元不可)</span>
-                <span class="item-cmd">cipher /w</span>
               </button>
               <button class="item-btn" data-type="defrag-drive">
                 <span class="item-label">ドライブ最適化・デフラグ</span>
@@ -256,6 +368,18 @@
                 <span class="item-label">ボリュームシリアル確認</span>
                 <span class="item-cmd">vol</span>
               </button>
+              <button class="item-btn item-danger" data-type="cipher-wipe">
+                <span class="item-label">[危険] 空き領域の完全抹消 (復元不可)</span>
+                <span class="item-cmd">cipher /w</span>
+              </button>
+              <button class="item-btn item-danger" data-type="format-drive">
+                <span class="item-label">[危険] ドライブの初期化・フォーマット</span>
+                <span class="item-cmd">format</span>
+              </button>
+              <button class="item-btn item-danger" data-type="diskpart-script">
+                <span class="item-label">[危険] パーティション管理・区画操作</span>
+                <span class="item-cmd">diskpart</span>
+              </button>
             </div>
           </details>
 
@@ -264,14 +388,18 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">📁 ファイル・検索・同期</span>
+                <span class="acc-title">ファイル・検索・同期</span>
               </div>
-              <span class="acc-count">12</span>
+              <span class="acc-count">13</span>
             </summary>
             <div class="acc-content">
               <button class="item-btn" data-type="robocopy-sync">
                 <span class="item-label">フォルダ丸ごと高速同期</span>
                 <span class="item-cmd">robocopy</span>
+              </button>
+              <button class="item-btn" data-type="symlink-create">
+                <span class="item-label">別ドライブへの分身リンクを作る</span>
+                <span class="item-cmd">mklink / ln -s</span>
               </button>
               <button class="item-btn" data-type="list-files">
                 <span class="item-label">ファイル一覧表示</span>
@@ -325,9 +453,9 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">⚙️ プロセス・サービス・電源</span>
+                <span class="acc-title">プロセス・サービス・電源</span>
               </div>
-              <span class="acc-count">6</span>
+              <span class="acc-count">7</span>
             </summary>
             <div class="acc-content">
               <button class="item-btn" data-type="process-list">
@@ -337,6 +465,10 @@
               <button class="item-btn" data-type="task-kill-name">
                 <span class="item-label">アプリの強制終了</span>
                 <span class="item-cmd">taskkill</span>
+              </button>
+              <button class="item-btn" data-type="service-control">
+                <span class="item-label">Windowsサービスの起動・停止</span>
+                <span class="item-cmd">net start / stop</span>
               </button>
               <button class="item-btn" data-type="service-list">
                 <span class="item-label">Windowsサービス稼働確認</span>
@@ -350,6 +482,10 @@
                 <span class="item-label">タイマー電源OFF / 再起動</span>
                 <span class="item-cmd">shutdown</span>
               </button>
+              <button class="item-btn" data-type="prevent-sleep">
+                <span class="item-label">勝手にスリープしない(常時稼働)</span>
+                <span class="item-cmd">powercfg /change</span>
+              </button>
               <button class="item-btn" data-type="open-notepad">
                 <span class="item-label">メモ帳で開いて編集</span>
                 <span class="item-cmd">notepad</span>
@@ -362,14 +498,34 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">🔒 セキュリティ・権限</span>
+                <span class="acc-title">セキュリティ・権限</span>
               </div>
-              <span class="acc-count">4</span>
+              <span class="acc-count">9</span>
             </summary>
             <div class="acc-content">
               <button class="item-btn" data-type="whoami-info">
                 <span class="item-label">ユーザー名と権限SID確認</span>
                 <span class="item-cmd">whoami</span>
+              </button>
+              <button class="item-btn" data-type="bitlocker-status">
+                <span class="item-label">BitLocker暗号化状態を点検</span>
+                <span class="item-cmd">manage-bde</span>
+              </button>
+              <button class="item-btn" data-type="cert-view">
+                <span class="item-label">PCの証明書ストアを確認</span>
+                <span class="item-cmd">certutil -store</span>
+              </button>
+              <button class="item-btn" data-type="open-regedit">
+                <span class="item-label">レジストリエディターを開く</span>
+                <span class="item-cmd">regedit</span>
+              </button>
+              <button class="item-btn" data-type="gpupdate-force">
+                <span class="item-label">セキュリティ設定を今すぐ最新化</span>
+                <span class="item-cmd">gpupdate</span>
+              </button>
+              <button class="item-btn" data-type="takeown-perm">
+                <span class="item-label">開けないファイルの権限を強制取得</span>
+                <span class="item-cmd">takeown / icacls</span>
               </button>
               <button class="item-btn" data-type="net-user-list">
                 <span class="item-label">登録ユーザーアカウント一覧</span>
@@ -391,7 +547,7 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">🛠️ レジストリ・高度な設定</span>
+                <span class="acc-title">レジストリ・高度な設定</span>
               </div>
               <span class="acc-count">3</span>
             </summary>
@@ -416,7 +572,7 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">📦 圧縮・ツール・Git</span>
+                <span class="acc-title">圧縮・ツール・Git</span>
               </div>
               <span class="acc-count">5</span>
             </summary>
@@ -449,7 +605,7 @@
             <summary>
               <div class="acc-header">
                 <span class="acc-chevron">▶</span>
-                <span class="acc-title">🧩 ロジック・自動化・Shell</span>
+                <span class="acc-title">ロジック・自動化・Shell</span>
               </div>
               <span class="acc-count">11</span>
             </summary>
@@ -501,6 +657,47 @@
             </div>
           </details>
 
+          <!-- 11. 業務・通知・API・データ処理 -->
+          <details class="sidebar-accordion">
+            <summary>
+              <div class="acc-header">
+                <span class="acc-chevron">▶</span>
+                <span class="acc-title">業務・通知・API・データ処理</span>
+              </div>
+              <span class="acc-count">7</span>
+            </summary>
+            <div class="acc-content">
+              <button class="item-btn highlight" data-type="webhook-notify">
+                <span class="item-label">Slack/Teams/Discord通知</span>
+                <span class="item-cmd">webhook</span>
+              </button>
+              <button class="item-btn highlight" data-type="toast-notification">
+                <span class="item-label">画面右下に通知バナー</span>
+                <span class="item-cmd">toast</span>
+              </button>
+              <button class="item-btn" data-type="csv-filter">
+                <span class="item-label">CSVから特定列を抽出</span>
+                <span class="item-cmd">csv filter</span>
+              </button>
+              <button class="item-btn" data-type="schtasks-register">
+                <span class="item-label">毎日定時実行タスク登録</span>
+                <span class="item-cmd">schtasks</span>
+              </button>
+              <button class="item-btn" data-type="fetch-json-api">
+                <span class="item-label">Web APIからJSON取得</span>
+                <span class="item-cmd">rest api</span>
+              </button>
+              <button class="item-btn" data-type="if-file-exists">
+                <span class="item-label">ファイルが存在するか分岐</span>
+                <span class="item-cmd">test-path</span>
+              </button>
+              <button class="item-btn" data-type="try-catch-block">
+                <span class="item-label">エラー安全ガード (try/catch)</span>
+                <span class="item-cmd">try-catch</span>
+              </button>
+            </div>
+          </details>
+
         </div>
 
         <!-- ユーザー自作ブロック一覧 -->
@@ -517,21 +714,96 @@
           <div class="editor-meta">
             <span class="section-title">並べたブロック</span>
             <span id="blockCount" class="badge">0</span>
+            <div class="undo-redo-group">
+              <button id="btnUndo" class="icon-btn-header" title="元に戻す (Ctrl+Z)" disabled>
+                <svg class="ui-icon" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+              </button>
+              <button id="btnRedo" class="icon-btn-header" title="やり直す (Ctrl+Y)" disabled>
+                <svg class="ui-icon" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13"/></svg>
+              </button>
+            </div>
             <span class="hint-date" title="ファイル名に {today} と書くと今日の日付に化けます">ヒント: <code>{today}</code> で今日の日付</span>
           </div>
           <div class="editor-controls">
-            <button id="btnExportScript" class="btn btn-default" title="PowerShell (.ps1) や Bash (.sh) として書き出す">📥 スクリプト書出</button>
-            <button id="btnRecipeModal" class="btn btn-default" title="ブロックの組み合わせをファイルに保存/読込">💾 レシピ保存/読込</button>
+            <!-- リスト表示 ⇄ ノード結線図 切り替え -->
+            <div class="view-toggle-group">
+              <button id="btnViewStack" class="btn-toggle active" title="リスト表示 (通常)">
+                <svg class="ui-icon sm" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                <span>リスト</span>
+              </button>
+              <button id="btnViewNode" class="btn-toggle" title="ノード結線図 (フロー表示)">
+                <svg class="ui-icon sm" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h4a2 2 0 0 1 2 2v7"/></svg>
+                <span>ノード</span>
+              </button>
+            </div>
+            <div class="divider"></div>
+            <button id="btnExportScript" class="btn btn-default" title="PowerShell (.ps1) や Bash (.sh) として書き出す">
+              <svg class="ui-icon sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>スクリプト書出</span>
+            </button>
+            <button id="btnRecipeModal" class="btn btn-default" title="ブロックの組み合わせをファイルに保存/読込">
+              <svg class="ui-icon sm" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <span>レシピ</span>
+            </button>
+            <button id="btnCreateMacro" class="btn btn-default" title="並べたブロックを1つの自作ブロックとして登録">
+              <svg class="ui-icon sm" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+              <span>マクロ化</span>
+            </button>
             <button id="btnClearCanvas" class="btn btn-default">全部消す</button>
-            <button id="btnRunAll" class="btn btn-primary">動かす (実行)</button>
+            <button id="btnStepRun" class="btn btn-default" title="1ブロックずつ確認しながら進める">
+              <svg class="ui-icon sm" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>ステップ実行</span>
+            </button>
+            <button id="btnRunAll" class="btn btn-primary">
+              <svg class="ui-icon sm" viewBox="0 0 24 24" style="stroke: #ffffff;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>実行</span>
+            </button>
           </div>
         </div>
 
         <!-- ブロック配置エリア -->
         <div class="canvas-area" id="canvas">
-          <div class="empty-state" id="emptyState">
-            <p>まだブロックがありません。</p>
-            <span class="empty-hint">左のメニューからブロックを選ぶか、上のおすすめセットをクリックしてみてください。</span>
+          <!-- A. 通常のリスト・スタック表示 (Scratch風コネクタ付き) -->
+          <div id="canvasStack" class="canvas-stack-view">
+            <div class="empty-state" id="emptyState">
+              <p>まだブロックがありません。</p>
+              <span class="empty-hint">左のメニューからブロックを選ぶか、上のおすすめセットをクリックしてみてください。</span>
+            </div>
+          </div>
+
+          <!-- B. ノード結線図 (Flow View) -->
+          <div id="canvasNodeGraph" class="canvas-node-view hidden">
+            <div class="node-canvas-toolbar">
+              <div class="node-canvas-toolbar-left">
+                <span class="node-canvas-title">パイプライン・フロー表示 (Flow Mode)</span>
+                <span class="node-canvas-hint">ノードを自由にドラッグして移動できます</span>
+              </div>
+              <div class="node-canvas-toolbar-right">
+                <div class="zoom-controls">
+                  <button id="btnZoomOut" class="btn btn-tiny" title="縮小 (Zoom Out)">−</button>
+                  <span id="zoomLevelDisplay" class="zoom-text">100%</span>
+                  <button id="btnZoomIn" class="btn btn-tiny" title="拡大 (Zoom In)">+</button>
+                  <button id="btnZoomFit" class="btn btn-tiny" title="全体を画面に収める (Fit View)">全体</button>
+                </div>
+                <button id="btnAlignNodes" class="btn btn-tiny" title="ノードを格子状に自動整列します">自動整列</button>
+              </div>
+            </div>
+            <div class="node-graph-viewport" id="nodeGraphViewport">
+              <svg id="nodeWireSvg" class="node-wire-layer"></svg>
+              <div id="nodeGraphNodes" class="node-cards-layer"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ステップ実行コントロールバー (ステップ実行時のみ表示) -->
+        <div id="stepControlBar" class="step-control-bar hidden">
+          <div class="step-info">
+            <span class="step-badge">ステップ実行中</span>
+            <span class="step-status"><strong id="stepCurrentNum">1</strong> / <span id="stepTotalNum">0</span> : <span id="stepBlockName">-</span></span>
+          </div>
+          <div class="step-actions">
+            <button id="btnStepNext" class="btn btn-primary">次へ進む</button>
+            <button id="btnStepStop" class="btn btn-default">中断</button>
           </div>
         </div>
 
@@ -545,24 +817,30 @@
             </div>
             <div class="console-actions">
               <button id="btnStopProcess" class="btn btn-danger-subtle hidden">途中で止める (中止)</button>
+              <button id="btnDiagnoseLog" class="btn btn-subtle hidden" title="エラーの原因と仕組みを解説します">
+                <svg class="ui-icon sm" style="stroke: #ef4444;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>エラー解説</span>
+              </button>
               <button id="btnCopyLog" class="btn btn-subtle">結果をコピー</button>
               <button id="btnClearLog" class="btn btn-subtle">画面をきれいにする</button>
             </div>
           </div>
 
-          <div id="explanationBox" class="note-box hidden"></div>
-          <pre id="outputLog" class="console-output">ここに実行結果が表示されます</pre>
+          <div class="console-body">
+            <pre id="outputLog" class="console-output">ここに実行結果が表示されます</pre>
+            <div id="explanationBox" class="console-explanation-panel hidden"></div>
+          </div>
         </section>
       </main>
     </div>
   </div>
 
-  <!-- 📖 全コマンド図鑑モーダル (全280+コマンドの目的別カタログ) -->
+  <!-- 全コマンド図鑑モーダル (全280+コマンドの目的別カタログ) -->
   <div id="catalogModal" class="modal-backdrop hidden">
     <div class="dialog catalog-dialog">
       <div class="dialog-header-row">
         <div>
-          <div class="dialog-title">📖 Windows全コマンド図鑑（逆引きカタログ）</div>
+          <div class="dialog-title">Windows全コマンド図鑑（逆引きカタログ）</div>
           <div class="dialog-desc">やりたいことから探して、クリックするだけでブロックとして追加できます。</div>
         </div>
         <button id="btnCatalogClose" class="btn btn-default">閉じる</button>
@@ -614,21 +892,27 @@
     </div>
   </div>
 
-  <!-- 削除の安全確認モーダル -->
+  <!-- 危険操作の安全確認モーダル -->
   <div id="confirmModal" class="modal-backdrop hidden">
-    <div class="dialog">
-      <div class="dialog-title">本当に消しても大丈夫ですか？</div>
+    <div class="dialog danger-confirm-dialog">
+      <div class="dialog-title" id="confirmModalTitle">
+        <svg class="ui-icon" style="stroke: #ef4444; width: 20px; height: 20px; vertical-align: text-bottom; margin-right: 6px;" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        警告：危険な操作が含まれています
+      </div>
       <div class="dialog-body">
-        <p>以下のファイルを削除しようとしています。消すと元に戻せない場合があります：</p>
-        <div id="modalTargetDetails" class="code-preview"></div>
-        <label class="confirm-row">
+        <div id="confirmActionExplanation" class="danger-explanation-box">
+          <!-- 「このブロックを動かすと〇〇されます」の説明が動的に挿入されます -->
+        </div>
+        <div class="field-label" style="margin-top: 6px; font-weight: 600; color: #475569;">裏で動く実際のコマンド：</div>
+        <div id="modalTargetDetails" class="code-preview" style="white-space: pre-wrap;"></div>
+        <label class="confirm-row" style="margin-top: 6px;">
           <input type="checkbox" id="modalCheckbox">
-          <span>確認しました。本当に削除します</span>
+          <span>上記のリスクを理解した上で、本当に実行します</span>
         </label>
       </div>
       <div class="dialog-footer">
-        <button id="btnModalCancel" class="btn btn-default">やめる</button>
-        <button id="btnModalConfirm" class="btn btn-danger" disabled>削除を実行する</button>
+        <button id="btnModalCancel" class="btn btn-default">やめる (安全)</button>
+        <button id="btnModalConfirm" class="btn btn-danger" disabled>実行する</button>
       </div>
     </div>
   </div>
@@ -648,12 +932,12 @@
     </div>
   </div>
 
-  <!-- 📥 スクリプト書き出しモーダル (PowerShell / Bash / バッチ) -->
+  <!-- スクリプト書き出しモーダル (PowerShell / Bash / バッチ) -->
   <div id="exportScriptModal" class="modal-backdrop hidden">
     <div class="dialog export-dialog">
       <div class="dialog-header-row">
         <div>
-          <div class="dialog-title">📥 スクリプトとして書き出す (Export)</div>
+          <div class="dialog-title">スクリプトとして書き出す (Export)</div>
           <div class="dialog-desc">並べたブロックを、本番サーバーやPCで直接動かせるスクリプトファイルとして出力します。</div>
         </div>
         <button id="btnExportClose" class="btn btn-default">閉じる</button>
@@ -676,12 +960,12 @@
     </div>
   </div>
 
-  <!-- 💾 レシピ保存 / 読込モーダル (JSON共有) -->
+  <!-- レシピ保存 / 読込モーダル (JSON共有) -->
   <div id="recipeModal" class="modal-backdrop hidden">
     <div class="dialog recipe-dialog">
       <div class="dialog-header-row">
         <div>
-          <div class="dialog-title">💾 レシピの保存と共有 (JSON)</div>
+          <div class="dialog-title">レシピの保存と共有 (JSON)</div>
           <div class="dialog-desc">並べたブロックと設定をファイルに保存して、チームや同僚と共有できます。</div>
         </div>
         <button id="btnRecipeClose" class="btn btn-default">閉じる</button>
@@ -689,7 +973,7 @@
       <div class="dialog-body recipe-dialog-body">
         <!-- エクスポート -->
         <div class="recipe-card-box">
-          <div class="recipe-box-title">📤 今のブロックを書き出す</div>
+          <div class="recipe-box-title">今のブロックを書き出す</div>
           <p class="recipe-box-desc">今のキャンバスのブロック設定を JSON ファイルとして保存します。</p>
           <div class="field-row">
             <input type="text" id="recipeExportName" class="text-input" placeholder="レシピ名 (例: PC初期設定, サーバー点検)" value="my_workflow">
@@ -698,12 +982,62 @@
         </div>
         <!-- インポート -->
         <div class="recipe-card-box">
-          <div class="recipe-box-title">📥 レシピファイルを読み込む</div>
+          <div class="recipe-box-title">レシピファイルを読み込む</div>
           <p class="recipe-box-desc">保存した <code>.json</code> レシピファイルを選んで、キャンバスに展開します。</p>
           <div class="field-row">
             <input type="file" id="recipeFileInput" accept=".json" class="file-input">
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 過去の実行履歴モーダル -->
+  <div id="historyModal" class="modal-backdrop hidden">
+    <div class="dialog history-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">過去の実行履歴</div>
+          <div class="dialog-desc">過去に実行したタスクの成否と出力ログを確認できます。クリックで当時のブロック構成を復元できます。</div>
+        </div>
+        <button id="btnHistoryClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div id="historyList" class="history-list">
+        <!-- 履歴アイテムを動的生成 -->
+      </div>
+      <div class="dialog-footer">
+        <button id="btnClearHistory" class="btn btn-danger-subtle">履歴をすべて削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 変数・秘密キー管理モーダル (Secret Store) -->
+  <div id="secretsModal" class="modal-backdrop hidden">
+    <div class="dialog secrets-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">変数・秘密キー管理 (Secret Store)</div>
+          <div class="dialog-desc">APIキーやURLを登録すると、ブロック内で <code>{変数名}</code> として安全に呼び出せます。</div>
+        </div>
+        <button id="btnSecretsClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div class="secrets-add-row">
+        <input type="text" id="secretKeyInput" class="form-input" placeholder="変数名 (例: webhook_url, token)">
+        <input type="text" id="secretValInput" class="form-input" placeholder="値 (例: https://hooks.slack.com/...)">
+        <button id="btnAddSecret" class="btn btn-primary">+ 追加</button>
+      </div>
+      <div id="secretsList" class="secrets-list">
+        <!-- 変数一覧を動的生成 -->
+      </div>
+    </div>
+  </div>
+      <div class="secrets-add-row">
+        <input type="text" id="secretKeyInput" class="form-input" placeholder="変数名 (例: webhook_url, token)">
+        <input type="text" id="secretValInput" class="form-input" placeholder="値 (例: https://hooks.slack.com/...)">
+        <button id="btnAddSecret" class="btn btn-primary">+ 追加</button>
+      </div>
+      <div id="secretsList" class="secrets-list">
+        <!-- 変数一覧を動的生成 -->
       </div>
     </div>
   </div>

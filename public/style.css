@@ -1,25 +1,90 @@
-/* style.css - Clean, Standard Desktop Tool Design */
+/* style.css - Clean, Standard Desktop Tool Design & Theme System */
 :root {
   --bg-main: #f8fafc;
   --bg-surface: #ffffff;
   --bg-sidebar: #f1f5f9;
   --bg-code: #1e293b;
+  --card-bg: #ffffff;
+  --input-bg: #ffffff;
   --border-color: #e2e8f0;
   --border-darker: #cbd5e1;
   --text-main: #0f172a;
   --text-muted: #64748b;
   --text-light: #94a3b8;
+  --badge-bg: #e2e8f0;
+  --badge-color: #475569;
+  --console-bg: #ffffff;
+  --console-text: #1e293b;
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --danger: #dc2626;
   --danger-hover: #b91c1c;
   --radius: 6px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 🌙 ダークモードテーマ変数 */
+[data-theme="dark"] {
+  --bg-main: #0b0f19;
+  --bg-surface: #111827;
+  --bg-sidebar: #0f172a;
+  --bg-code: #030712;
+  --card-bg: #151e32;
+  --input-bg: #090d16;
+  --border-color: #1f293d;
+  --border-darker: #334155;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-light: #64748b;
+  --badge-bg: #1e293b;
+  --badge-color: #94a3b8;
+  --console-bg: #070b14;
+  --console-text: #e2e8f0;
+  --primary: #38bdf8;
+  --primary-hover: #60a5fa;
+  --danger: #ef4444;
+  --danger-hover: #f87171;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* 🎨 プロ向けミニマル・ベクターSVGアイコン */
+.ui-icon {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  display: inline-block;
+  vertical-align: -2px;
+  flex-shrink: 0;
+}
+
+.ui-icon.sm {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.8;
+}
+
+.ui-icon.xs {
+  width: 10px;
+  height: 10px;
+  stroke-width: 2;
+}
+
+.ui-icon.lg {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
 }
 
 body {
@@ -29,6 +94,7 @@ body {
   font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .app-layout {
@@ -47,6 +113,7 @@ body {
   justify-content: space-between;
   padding: 0 16px;
   flex-shrink: 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .toolbar-group {
@@ -59,7 +126,7 @@ body {
   font-weight: 700;
   font-size: 14px;
   letter-spacing: -0.3px;
-  color: #1e293b;
+  color: var(--text-main);
 }
 
 .divider {
@@ -81,7 +148,7 @@ body {
 
 .path-text {
   font-family: "IBM Plex Mono", Consolas, monospace;
-  background-color: #f1f5f9;
+  background-color: var(--input-bg);
   padding: 3px 8px;
   border-radius: var(--radius);
   border: 1px solid var(--border-color);
@@ -89,7 +156,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #334155;
+  color: var(--text-main);
 }
 
 .checkbox-label {
@@ -100,6 +167,29 @@ body {
   color: var(--text-muted);
   cursor: pointer;
   user-select: none;
+}
+
+/* 🌓 テーマ切り替えボタン */
+.btn-theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-theme:hover {
+  background-color: var(--bg-surface);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ワークベンチ (左右分割) */
@@ -120,6 +210,7 @@ body {
   flex-direction: column;
   gap: 12px;
   flex-shrink: 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 /* 検索バー ＆ 上部アクション */
@@ -143,7 +234,7 @@ body {
   width: 100%;
   padding: 7px 10px;
   font-size: 12px;
-  background-color: #ffffff;
+  background-color: var(--input-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   color: var(--text-main);
@@ -152,7 +243,7 @@ body {
 .search-input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
 .sidebar-actions {
@@ -174,19 +265,19 @@ body {
 }
 
 .btn-tiny {
-  background-color: #ffffff;
+  background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 3px;
   padding: 2px 7px;
   font-size: 10px;
-  color: #475569;
+  color: var(--text-muted);
   cursor: pointer;
   font-weight: 500;
   transition: all 0.1s;
 }
 
 .btn-tiny:hover {
-  background-color: #f1f5f9;
+  background-color: var(--bg-surface);
   color: var(--text-main);
   border-color: var(--border-darker);
 }
@@ -195,7 +286,7 @@ body {
 .sidebar-accordion {
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  background-color: #ffffff;
+  background-color: var(--card-bg);
   overflow: hidden;
   transition: border-color 0.15s;
 }
@@ -204,14 +295,14 @@ body {
   padding: 7px 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-main);
   cursor: pointer;
   user-select: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   list-style: none;
-  background-color: #f8fafc;
+  background-color: var(--bg-surface);
   transition: background-color 0.1s;
 }
 
@@ -220,13 +311,13 @@ body {
 }
 
 .sidebar-accordion summary:hover {
-  background-color: #f1f5f9;
+  background-color: var(--bg-sidebar);
   color: var(--primary);
 }
 
 .sidebar-accordion[open] summary {
   border-bottom: 1px solid var(--border-color);
-  background-color: #f1f5f9;
+  background-color: var(--bg-surface);
 }
 
 .acc-header {
@@ -237,7 +328,7 @@ body {
 
 .acc-chevron {
   font-size: 9px;
-  color: #94a3b8;
+  color: var(--text-light);
   display: inline-block;
   transition: transform 0.15s ease;
 }
@@ -253,8 +344,8 @@ body {
 .acc-count {
   font-size: 10px;
   font-weight: 600;
-  background-color: #e2e8f0;
-  color: #475569;
+  background-color: var(--badge-bg);
+  color: var(--badge-color);
   padding: 1px 6px;
   border-radius: 10px;
 }
@@ -264,7 +355,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  background-color: #ffffff;
+  background-color: var(--bg-sidebar);
 }
 
 .sidebar-block {
@@ -289,7 +380,7 @@ body {
 }
 
 .preset-btn {
-  background-color: var(--bg-surface);
+  background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   padding: 8px 10px;
@@ -302,14 +393,14 @@ body {
 }
 
 .preset-btn:hover {
-  background-color: #ffffff;
-  border-color: var(--border-darker);
+  background-color: var(--bg-surface);
+  border-color: var(--primary);
 }
 
 .preset-name {
   font-weight: 600;
   font-size: 12px;
-  color: #1e293b;
+  color: var(--text-main);
 }
 
 .preset-desc {
@@ -319,13 +410,13 @@ body {
 
 /* コマンドアイテムボタン (日本語ラベル ＋ コマンド名バッジ) */
 .item-btn {
-  background-color: #ffffff;
+  background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   padding: 5px 8px;
   text-align: left;
   font-size: 11.5px;
-  color: #334155;
+  color: var(--text-main);
   cursor: pointer;
   transition: all 0.1s;
   display: flex;
@@ -344,11 +435,11 @@ body {
 .item-btn .item-cmd {
   font-family: "IBM Plex Mono", Consolas, monospace;
   font-size: 10px;
-  color: #64748b;
-  background-color: #f1f5f9;
+  color: var(--text-muted);
+  background-color: var(--input-bg);
   padding: 1px 5px;
   border-radius: 3px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-color);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -356,12 +447,12 @@ body {
 .item-btn:hover {
   border-color: var(--primary);
   color: var(--primary);
-  background-color: #eff6ff;
+  background-color: var(--bg-surface);
 }
 
 .item-btn:hover .item-cmd {
-  background-color: #dbeafe;
-  border-color: #bfdbfe;
+  background-color: var(--bg-sidebar);
+  border-color: var(--primary);
   color: var(--primary);
 }
 
@@ -415,26 +506,27 @@ body {
 .section-title {
   font-weight: 600;
   font-size: 13px;
-  color: #1e293b;
+  color: var(--text-main);
 }
 
 .hint-date {
   font-size: 11px;
-  color: #64748b;
+  color: var(--text-muted);
   margin-left: 8px;
 }
 
 .hint-date code {
-  background-color: #f1f5f9;
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
   padding: 1px 4px;
   border-radius: 3px;
-  color: #0284c7;
+  color: var(--primary);
   font-family: "IBM Plex Mono", monospace;
 }
 
 .badge {
-  background-color: #e2e8f0;
-  color: #475569;
+  background-color: var(--badge-bg);
+  color: var(--badge-color);
   font-size: 11px;
   padding: 2px 7px;
   border-radius: 10px;
@@ -454,19 +546,31 @@ body {
   font-weight: 500;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: background-color 0.1s, border-color 0.1s;
+  transition: all 0.15s ease;
+}
+
+.btn-default {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
+.btn-default:hover {
+  background-color: var(--bg-surface);
+  border-color: var(--border-darker);
 }
 
 .btn-catalog {
-  background-color: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #0f172a;
+  background-color: var(--bg-sidebar);
+  border-color: var(--border-color);
+  color: var(--text-main);
   font-weight: 600;
 }
 
 .btn-catalog:hover {
-  background-color: #e2e8f0;
-  border-color: #94a3b8;
+  background-color: var(--bg-surface);
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 /* 図鑑モーダル */
@@ -505,7 +609,7 @@ body {
 }
 
 .catalog-card {
-  background-color: #ffffff;
+  background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   padding: 10px;
@@ -519,9 +623,9 @@ body {
 
 .catalog-card:hover {
   border-color: var(--primary);
-  background-color: #f8fafc;
+  background-color: var(--bg-surface);
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .catalog-card-header {
@@ -533,17 +637,18 @@ body {
 .catalog-cmd-badge {
   font-family: "IBM Plex Mono", monospace;
   font-size: 10px;
-  background-color: #f1f5f9;
+  background-color: var(--input-bg);
   padding: 1px 5px;
   border-radius: 3px;
-  color: #0284c7;
+  border: 1px solid var(--border-color);
+  color: var(--primary);
   font-weight: 500;
 }
 
 .catalog-card-title {
   font-weight: 600;
   font-size: 12px;
-  color: #1e293b;
+  color: var(--text-main);
   line-height: 1.3;
 }
 
@@ -581,6 +686,7 @@ body {
   border: none;
   color: var(--primary);
   padding: 4px 8px;
+  cursor: pointer;
 }
 
 .btn-subtle:hover {
@@ -590,12 +696,87 @@ body {
 /* キャンバス本体 */
 .canvas-area {
   flex: 1;
+  position: relative;
   overflow-y: auto;
-  padding: 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 表示切り替えトグル (リスト ⇄ TouchDesignerノード) */
+.view-toggle-group {
+  display: flex;
+  background-color: var(--bg-sidebar);
+  padding: 2px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  gap: 2px;
+}
+
+.btn-toggle {
+  background: none;
+  border: none;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.1s;
+}
+
+.btn-toggle:hover {
+  color: var(--text-main);
+}
+
+.btn-toggle.active {
+  background-color: var(--card-bg);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 通常スタックビュー */
+.canvas-stack-view {
+  width: 100%;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
+  box-sizing: border-box;
+}
+
+/* Scratch風の精密コネクタ (パイプ結線デザイン) */
+.connector-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: -6px 0;
+  z-index: 2;
+}
+
+.connector-arrow .pipe-joint {
+  width: 14px;
+  height: 16px;
+  background: linear-gradient(180deg, #94a3b8, #64748b);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .connector-arrow .pipe-joint {
+  background: linear-gradient(180deg, #475569, #334155);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.connector-arrow .pipe-joint::after {
+  content: '▼';
+  font-size: 8px;
+  color: #ffffff;
+  transform: scaleY(0.7);
 }
 
 .empty-state {
@@ -615,16 +796,16 @@ body {
 .block-card {
   width: 100%;
   max-width: 620px;
-  background-color: var(--bg-surface);
+  background-color: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
   transition: transform 0.1s, box-shadow 0.1s, border-color 0.1s;
 }
 
 .block-card.dragging {
   opacity: 0.4;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
   border: 1px dashed var(--primary);
 }
 
@@ -655,7 +836,7 @@ body {
 .block-card-header {
   height: 36px;
   padding: 0 10px 0 14px;
-  background-color: #f8fafc;
+  background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -670,7 +851,7 @@ body {
   gap: 8px;
   font-weight: 600;
   font-size: 12px;
-  color: #1e293b;
+  color: var(--text-main);
 }
 
 .block-card-controls {
@@ -694,8 +875,8 @@ body {
 }
 
 .icon-btn:hover {
-  background-color: #e2e8f0;
-  color: #0f172a;
+  background-color: var(--bg-sidebar);
+  color: var(--text-main);
 }
 
 .block-card-body {
@@ -720,9 +901,9 @@ body {
 
 .form-input, .form-select {
   flex: 1;
-  background-color: #ffffff;
+  background-color: var(--input-bg);
   border: 1px solid var(--border-color);
-  color: #0f172a;
+  color: var(--text-main);
   padding: 6px 10px;
   border-radius: var(--radius);
   font-size: 12px;
@@ -735,13 +916,42 @@ body {
 
 .internal-cmd-preview {
   display: none;
-  background-color: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
   padding: 6px 10px;
   border-radius: 4px;
   font-family: "IBM Plex Mono", Consolas, monospace;
   font-size: 11px;
-  color: #0284c7;
+  color: var(--primary);
+}
+
+/* ⚠️ 危険ブロックカード (上級者用・赤枠) */
+.block-card.card-danger {
+  border: 1.5px solid #ef4444 !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);
+}
+
+.block-card.card-danger .block-card-header {
+  background-color: #fef2f2;
+  border-bottom: 1px solid #fee2e2;
+}
+
+.block-card.card-danger .block-name {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.danger-warning-note {
+  font-size: 11px;
+  color: #b91c1c;
+  background-color: #fff1f2;
+  border: 1px solid #fecdd3;
+  padding: 5px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
 }
 
 .show-commands .internal-cmd-preview {
@@ -758,7 +968,7 @@ body {
 
 /* 実行ログコンソール */
 .console-pane {
-  height: 240px;
+  height: 280px;
   background-color: var(--bg-surface);
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -766,9 +976,53 @@ body {
   flex-shrink: 0;
 }
 
+.console-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.console-output {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 16px;
+  font-family: "IBM Plex Mono", Consolas, "Courier New", monospace;
+  font-size: 12px;
+  color: var(--console-text);
+  background-color: var(--console-bg);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+/* 右側のエラー解説スプリットパネル（実行ログと横並びで表示され、ログが一切隠れない） */
+.console-explanation-panel {
+  width: 440px;
+  max-width: 50%;
+  border-left: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  overflow-y: auto;
+  padding: 12px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  animation: slideInDiagPanel 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.console-explanation-panel.hidden {
+  display: none !important;
+}
+
+@keyframes slideInDiagPanel {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .console-header {
   height: 36px;
-  background-color: #f8fafc;
+  background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-color);
   padding: 0 16px;
   display: flex;
@@ -782,7 +1036,7 @@ body {
   gap: 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-main);
 }
 
 .status-indicator {
@@ -793,8 +1047,8 @@ body {
 }
 
 .status-indicator.idle {
-  background-color: #e2e8f0;
-  color: #64748b;
+  background-color: var(--badge-bg);
+  color: var(--badge-color);
 }
 
 .status-indicator.running {
@@ -802,14 +1056,29 @@ body {
   color: #b45309;
 }
 
+[data-theme="dark"] .status-indicator.running {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
 .status-indicator.success {
   background-color: #dcfce7;
   color: #15803d;
 }
 
+[data-theme="dark"] .status-indicator.success {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
 .status-indicator.error {
   background-color: #fee2e2;
   color: #b91c1c;
+}
+
+[data-theme="dark"] .status-indicator.error {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
 }
 
 .duration-text {
@@ -826,24 +1095,175 @@ body {
   font-size: 12px;
 }
 
-.console-output {
-  flex: 1;
-  overflow: auto;
-  padding: 12px 16px;
-  font-family: "IBM Plex Mono", Consolas, "Courier New", monospace;
+[data-theme="dark"] .note-box {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-left-color: #38bdf8;
+  color: #93c5fd;
+}
+
+/* 日本語エラー解説専用カード */
+.error-diag-card {
+  background: var(--bg-surface);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-left: 3px solid #ef4444;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .error-diag-card {
+  background: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.3);
+  border-left-color: #f87171;
+  box-shadow: none;
+}
+
+@keyframes fadeInDiag {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.error-diag-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.error-diag-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+[data-theme="dark"] .error-diag-title {
+  color: #fca5a5;
+}
+
+.error-diag-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+[data-theme="dark"] .error-diag-badge {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.error-diag-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.error-diag-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .error-diag-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.error-diag-summary {
+  font-size: 13px;
+  font-weight: 700;
   color: #1e293b;
-  background-color: #ffffff;
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.6;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+[data-theme="dark"] .error-diag-summary {
+  color: #f1f5f9;
+}
+
+.error-diag-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.error-diag-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.diag-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+[data-theme="dark"] .diag-label {
+  color: #94a3b8;
+}
+
+.diag-text {
+  margin: 0;
+  color: #334155;
+}
+
+[data-theme="dark"] .diag-text {
+  color: #cbd5e1;
+}
+
+.diag-text.concept-text {
+  color: #1e40af;
+  background: #f0f7ff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border-left: 2px solid #3b82f6;
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .diag-text.concept-text {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.12);
+  border-left-color: #60a5fa;
+}
+
+.diag-text.action-text {
+  color: #0f766e;
+  background: #f0fdf4;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border-left: 2px solid #10b981;
+  font-weight: 500;
+}
+
+[data-theme="dark"] .diag-text.action-text {
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.1);
+  border-left-color: #34d399;
 }
 
 /* ダイアログ */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 23, 42, 0.4);
+  background-color: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -856,7 +1276,7 @@ body {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
   padding: 20px;
 }
 
@@ -864,19 +1284,19 @@ body {
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 12px;
-  color: #0f172a;
+  color: var(--text-main);
 }
 
 .dialog-body {
   font-size: 12px;
-  color: #475569;
+  color: var(--text-muted);
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .code-preview {
-  background-color: #f1f5f9;
+  background-color: var(--input-bg);
   border: 1px solid var(--border-color);
   padding: 8px 10px;
   border-radius: 4px;
@@ -891,7 +1311,7 @@ body {
   gap: 8px;
   font-size: 12px;
   cursor: pointer;
-  color: #1e293b;
+  color: var(--text-main);
 }
 
 .dialog-footer {
@@ -904,9 +1324,16 @@ body {
 .text-input {
   width: 100%;
   padding: 6px 10px;
+  background-color: var(--input-bg);
   border: 1px solid var(--border-color);
+  color: var(--text-main);
   border-radius: var(--radius);
   font-size: 12px;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
 /* スクリプト書き出しダイアログ */
@@ -934,13 +1361,13 @@ body {
 }
 
 .tab-btn:hover {
-  background-color: #f1f5f9;
+  background-color: var(--bg-sidebar);
   color: var(--text-main);
 }
 
 .tab-btn.active {
-  background-color: #eff6ff;
-  border-color: #bfdbfe;
+  background-color: var(--card-bg);
+  border-color: var(--primary);
   color: var(--primary);
   font-weight: 600;
 }
@@ -965,12 +1392,12 @@ body {
 .export-pre {
   height: 240px;
   overflow-y: auto;
-  color: #1e293b;
+  color: var(--text-main);
   font-size: 11.5px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-all;
-  background-color: #f8fafc;
+  background-color: var(--input-bg);
   border: 1px solid var(--border-color);
 }
 
@@ -986,7 +1413,7 @@ body {
 }
 
 .recipe-card-box {
-  background-color: #f8fafc;
+  background-color: var(--input-bg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   padding: 12px 14px;
@@ -998,7 +1425,7 @@ body {
 .recipe-box-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-main);
 }
 
 .recipe-box-desc {
@@ -1016,9 +1443,545 @@ body {
 .file-input {
   font-size: 12px;
   padding: 4px 0;
-  color: #334155;
+  color: var(--text-main);
+}
+
+/* ⚠️ 危険操作の安全確認モーダル */
+.danger-confirm-dialog {
+  max-width: 520px;
+}
+
+.danger-explanation-box {
+  background-color: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-left: 4px solid #ef4444;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #991b1b;
+  line-height: 1.6;
+}
+
+[data-theme="dark"] .danger-explanation-box {
+  background-color: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.danger-explanation-box strong {
+  color: #7f1d1d;
+}
+
+[data-theme="dark"] .danger-explanation-box strong {
+  color: #f87171;
+}
+
+/* 🔀 ノード結線図 (Flow View) */
+.canvas-node-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: #0b1120;
+  background-image: 
+    radial-gradient(#1e293b 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  overflow: hidden;
+}
+
+.node-canvas-toolbar {
+  height: 32px;
+  background-color: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid #1e293b;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+}
+
+.node-canvas-toolbar-left,
+.node-canvas-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.node-canvas-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #38bdf8;
+  font-family: "IBM Plex Mono", monospace;
+  letter-spacing: 0.5px;
+}
+
+.node-canvas-hint {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.node-graph-viewport {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  padding: 40px;
+}
+
+.node-wire-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3500px;
+  height: 2500px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.node-cards-layer {
+  position: relative;
+  z-index: 2;
+  min-width: 1400px;
+  min-height: 900px;
+}
+
+/* ノードカード (パラメータ編集 & 自由ドラッグ対応) */
+.flow-node-card {
+  position: absolute;
+  width: 290px;
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  color: #f1f5f9;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  cursor: default;
+  user-select: none;
+}
+
+.flow-node-card:hover {
+  border-color: #38bdf8;
+  box-shadow: 0 12px 30px rgba(56, 189, 248, 0.25);
+}
+
+.flow-node-card.dragging-active {
+  box-shadow: 0 16px 36px rgba(56, 189, 248, 0.4) !important;
+  border-color: #38bdf8 !important;
+  z-index: 50 !important;
+}
+
+.flow-node-card.step-active {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 22px rgba(56, 189, 248, 0.8) !important;
+  animation: stepGlow 1.2s infinite alternate;
+}
+
+.block-card.step-active {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 16px rgba(37, 99, 235, 0.5) !important;
+  animation: stepGlow 1.2s infinite alternate;
+}
+
+@keyframes stepGlow {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.015);
+  }
+}
+
+.flow-node-header {
+  height: 32px;
+  background-color: #0f172a;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  border-bottom: 1px solid #334155;
+  padding: 0 8px 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: grab;
+}
+
+.flow-node-header:active {
+  cursor: grabbing;
+}
+
+/* ステップ実行コントロールバー */
+.step-control-bar {
+  height: 44px;
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.08), rgba(56, 189, 248, 0.04));
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.step-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.step-badge {
+  background-color: var(--primary);
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+}
+
+.step-status {
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.step-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.flow-node-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flow-node-step {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.flow-node-cmd {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  color: #94a3b8;
+  background-color: #1e293b;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.flow-node-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.flow-node-controls .icon-btn {
+  color: #94a3b8;
+  width: 20px;
+  height: 20px;
+}
+
+.flow-node-controls .icon-btn:hover {
+  background-color: #334155;
+  color: #ffffff;
+}
+
+.flow-node-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-node-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+  line-height: 1.3;
+}
+
+.flow-danger-note {
+  font-size: 10.5px;
+  color: #f87171;
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 4px 6px;
+  border-radius: 4px;
+  line-height: 1.3;
+}
+
+.flow-node-body .form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flow-node-body .form-label {
+  font-size: 11px;
+  color: #94a3b8;
+  width: 75px;
+  flex-shrink: 0;
+}
+
+.flow-node-body .form-input,
+.flow-node-body .form-select {
+  flex: 1;
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  color: #f8fafc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.flow-node-body .form-input:focus,
+.flow-node-body .form-select:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.flow-node-preview {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: #38bdf8;
+  background-color: #0f172a;
+  padding: 5px 8px;
+  border-radius: 4px;
+  border: 1px solid #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ポート端子 (IN / OUT) */
+.flow-port {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #38bdf8;
+  border: 2px solid #0b1120;
+  box-shadow: 0 0 6px #38bdf8;
+  z-index: 5;
+}
+
+.flow-port-in {
+  left: -6px;
+}
+
+.flow-port-out {
+  right: -6px;
+}
+
+.flow-node-card.danger-node {
+  border-color: #ef4444;
+}
+
+.flow-node-card.danger-node .flow-node-header {
+  background-color: rgba(239, 68, 68, 0.25);
+}
+
+.flow-node-card.danger-node .flow-node-step {
+  color: #f87171;
+}
+
+.flow-node-card.danger-node .flow-port {
+  background-color: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+/* SVGワイヤー結線 (ベジェ曲線アニメーション) */
+.wire-path {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 6 3;
+  animation: wireFlow 1.2s linear infinite;
+  opacity: 0.9;
+}
+
+.wire-path.danger-wire {
+  stroke: #ef4444;
+}
+
+@keyframes wireFlow {
+  from {
+    stroke-dashoffset: 18;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 .hidden {
   display: none !important;
+}
+
+/* ↩️ Undo / Redo ボタングループ */
+.undo-redo-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.icon-btn-header {
+  background: none;
+  border: 1px solid var(--border-color);
+  background-color: var(--card-bg);
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.1s;
+}
+
+.icon-btn-header:hover:not(:disabled) {
+  background-color: var(--bg-surface);
+  border-color: var(--primary);
+}
+
+.icon-btn-header:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* 🔍 ズーム操作コントロール */
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: rgba(15, 23, 42, 0.6);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #334155;
+}
+
+.zoom-text {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: #38bdf8;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* 📜 実行履歴モーダル */
+.history-dialog {
+  max-width: 640px;
+}
+
+.history-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.history-item {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.history-item:hover {
+  border-color: var(--primary);
+  background-color: var(--bg-surface);
+  transform: translateX(2px);
+}
+
+.history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.history-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.history-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.history-badge.success {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.history-badge.error {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* 🔑 変数・秘密キー管理モーダル */
+.secrets-dialog {
+  max-width: 580px;
+}
+
+.secrets-add-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.secrets-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.secret-item {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.secret-key {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.secret-val {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
