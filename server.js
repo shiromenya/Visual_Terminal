@@ -1,12 +1,16 @@
-// server.js - Graphical Terminal Backend
+// server.js - Graphical Terminal Backend (Windows / macOS / Linux 両対応)
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
+const os = require('node:os');
 
 let currentWorkingDir = process.cwd();
 const PORT = 3456;
-let activeProcess = null; // 現在実行中の子プロセス
+let activeProcess = null;
+
+const isWindows = process.platform === 'win32';
+const isMac = process.platform === 'darwin';
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -20,17 +24,17 @@ function explainError(stderr, exitCode) {
   if (!stderr && exitCode === 0) return null;
   const msg = (stderr || '').toLowerCase();
   
-  if (msg.includes('cannot find the path') || msg.includes('パスが見つかりません') || msg.includes('does not exist')) {
-    return '【エラー解説】指定したファイルまたはフォルダが見つかりませんでした。パスのスペルや場所を確認してください。';
+  if (msg.includes('cannot find') || msg.includes('no such file') || msg.includes('not found') || msg.includes('パスが見つかりません')) {
+    return '【エラー解説】指定したファイルまたはフォルダが見つかりませんでした。名前や場所を確認してください。';
   }
-  if (msg.includes('permission') || msg.includes('アクセスが拒否されました') || msg.includes('access is denied')) {
-    return '【エラー解説】アクセス権限がありません。管理者権限が必要か、ファイルがロックされています。';
+  if (msg.includes('permission denied') || msg.includes('アクセスが拒否されました') || msg.includes('operation not permitted')) {
+    return '【エラー解説】アクセス権限がありません。管理者権限（sudo / RunAs）が必要か、ファイルが開かれています。';
   }
-  if (msg.includes('is not recognized') || msg.includes('認識されていません') || msg.includes('not found')) {
-    return '【エラー解説】そのコマンドやツールがPCにインストールされていないか、PATHが通っていません。';
+  if (msg.includes('command not found') || msg.includes('認識されていません')) {
+    return '【エラー解説】そのツールやコマンドがパソコンに入っていません。';
   }
   if (msg.includes('fatal: not a git repository')) {
-    return '【エラー解説】ここはGitリポジトリではありません。先に「git init」を行う必要があります。';
+    return '【エラー解説】ここはGitで管理されているフォルダではありません。';
   }
   return '【エラー解説】処理中にエラーが発生しました。出力を確認してください。';
 }
@@ -48,10 +52,14 @@ const server = http.createServer((req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host}`);
 
-  // CWD取得
+  // CWD & OS情報取得
   if (url.pathname === '/api/cwd' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ cwd: currentWorkingDir }));
+    res.end(JSON.stringify({ 
+      cwd: currentWorkingDir,
+      platform: process.platform, // 'win32', 'darwin', 'linux'
+      osName: isWindows ? 'Windows' : (isMac ? 'macOS' : 'Linux')
+    }));
     return;
   }
 
@@ -78,12 +86,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // プロセス中断 (Ctrl+C 相当)
+  // プロセス中断 (Ctrl+C / Kill)
   if (url.pathname === '/api/kill' && req.method === 'POST') {
     if (activeProcess) {
       try {
-        // Windowsで子プロセスツリーごと強制終了
-        spawn('taskkill', ['/pid', activeProcess.pid, '/f', '/t']);
+        if (isWindows) {
+          spawn('taskkill', ['/pid', activeProcess.pid, '/f', '/t']);
+        } else {
+          activeProcess.kill('SIGKILL');
+        }
         activeProcess = null;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, message: 'プロセスを中断しました。' }));
@@ -97,7 +108,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // PowerShellコマンド実行
+  // コマンド実行 (Windows: PowerShell / Mac・Linux: bash/zsh)
   if (url.pathname === '/api/execute' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
@@ -111,12 +122,22 @@ const server = http.createServer((req, res) => {
         }
 
         const startTime = Date.now();
-        const psCommand = `chcp 65001 >$null; $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${script}`;
 
-        activeProcess = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psCommand], {
-          cwd: currentWorkingDir,
-          env: process.env
-        });
+        if (isWindows) {
+          // Windows: PowerShell (UTF-8)
+          const psCommand = `chcp 65001 >$null; $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${script}`;
+          activeProcess = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psCommand], {
+            cwd: currentWorkingDir,
+            env: process.env
+          });
+        } else {
+          // macOS / Linux: /bin/bash or /bin/zsh
+          const shellBin = fs.existsSync('/bin/zsh') ? '/bin/zsh' : '/bin/bash';
+          activeProcess = spawn(shellBin, ['-c', script], {
+            cwd: currentWorkingDir,
+            env: { ...process.env, LANG: 'ja_JP.UTF-8' }
+          });
+        }
 
         let stdout = '';
         let stderr = '';
@@ -176,6 +197,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[Graphical Terminal] サーバーが起動しました: http://127.0.0.1:${PORT}`);
+  const osLabel = isWindows ? 'Windows' : (isMac ? 'macOS' : 'Linux');
+  console.log(`[Graphical Terminal] サーバーが起動しました (${osLabel}): http://127.0.0.1:${PORT}`);
   console.log(`[Graphical Terminal] 初期作業ディレクトリ: ${currentWorkingDir}`);
 });

@@ -15,6 +15,7 @@
     <header class="toolbar">
       <div class="toolbar-group">
         <span class="app-title">Graphical Terminal</span>
+        <span id="osBadge" class="badge" title="お使いのOSを自動判別しています">Windows</span>
         <div class="divider"></div>
         <div class="path-display">
           <span class="path-label">今の作業フォルダ:</span>
@@ -35,7 +36,7 @@
           <span>管理者として動かす</span>
         </label>
         <div class="divider"></div>
-        <label class="checkbox-label">
+        <label class="checkbox-label" title="裏で動くPowerShellやコマンドプロンプトのコードを表示します">
           <input type="checkbox" id="toggleShowCommands" checked>
           <span>裏で動くコマンドを見る</span>
         </label>
@@ -49,28 +50,28 @@
       <aside class="sidebar">
         <!-- 検索バー（やりたいこと検索） -->
         <div class="search-box">
-          <input type="text" id="blockSearchInput" class="search-input" placeholder="やりたいことを探す (例: 質問, 繰り返す, zip...)">
+          <input type="text" id="blockSearchInput" class="search-input" placeholder="やりたいことを探す (例: バッテリー, 修復, 同期...)">
         </div>
 
         <!-- おすすめセット -->
         <div class="sidebar-block" id="presetSection">
           <div class="sidebar-header">すぐ使えるおすすめセット</div>
           <div class="preset-group">
+            <button class="preset-btn" data-recipe="battery-check">
+              <span class="preset-name">ノートPCバッテリー診断</span>
+              <span class="preset-desc">劣化状態・寿命をHTMLレポート出力</span>
+            </button>
+            <button class="preset-btn" data-recipe="folder-sync">
+              <span class="preset-name">フォルダの高速ミラー同期</span>
+              <span class="preset-desc">robocopyで差分を完全バックアップ</span>
+            </button>
+            <button class="preset-btn" data-recipe="pc-repair">
+              <span class="preset-name">Windowsの健康チェック・修復</span>
+              <span class="preset-desc">ディスク故障検査とシステム修復</span>
+            </button>
             <button class="preset-btn" data-recipe="date-backup">
               <span class="preset-name">今日の日付入りZip保存</span>
               <span class="preset-desc">backup_20261108.zip を自動作成</span>
-            </button>
-            <button class="preset-btn" data-recipe="interactive-save">
-              <span class="preset-name">名前を聞いてファイル保存</span>
-              <span class="preset-desc">入力してもらった名前で保存</span>
-            </button>
-            <button class="preset-btn" data-recipe="pc-health">
-              <span class="preset-name">パソコンの健康診断</span>
-              <span class="preset-desc">メモリの空きや基本情報を確認</span>
-            </button>
-            <button class="preset-btn" data-recipe="diff-check">
-              <span class="preset-name">2つのファイルの違いを調べる</span>
-              <span class="preset-desc">新旧の文章を一行ずつ見比べる</span>
             </button>
           </div>
         </div>
@@ -79,10 +80,56 @@
         <div class="sidebar-block" id="allBlocksSection">
           <div class="sidebar-header">使えるブロック一覧</div>
 
-          <!-- 対話・繰り返し・条件（本格制御） -->
+          <!-- Windows公式の強力ツール (新設) -->
+          <div class="category">
+            <div class="category-name">Windows公式・メンテナンス</div>
+            <button class="item-btn highlight" data-type="battery-report">ノートPCのバッテリー寿命を調べる (powercfg)</button>
+            <button class="item-btn highlight" data-type="robocopy-sync">フォルダを丸ごと高速同期・バックアップ (robocopy)</button>
+            <button class="item-btn" data-type="disk-check">ドライブの故障・エラーを検査する (chkdsk)</button>
+            <button class="item-btn" data-type="sys-repair">壊れたシステムファイルを修復する (sfc)</button>
+            <button class="item-btn" data-type="device-drivers">繋がっている機器・ドライバ一覧 (driverquery)</button>
+            <button class="item-btn" data-type="toggle-hidden">隠しファイルに設定/解除する (attrib)</button>
+            <button class="item-btn" data-type="assoc-ext">拡張子をどのアプリで開くか調べる (assoc)</button>
+          </div>
+
+          <!-- ファイルとフォルダの操作 -->
+          <div class="category">
+            <div class="category-name">ファイルとフォルダの操作</div>
+            <button class="item-btn" data-type="view-tree">フォルダの構造を木の枝の形で見せる (tree)</button>
+            <button class="item-btn" data-type="make-dir">新しいフォルダを作る (mkdir)</button>
+            <button class="item-btn" data-type="move-file">ファイルを別の場所に移動する (move)</button>
+            <button class="item-btn" data-type="rename-file">ファイルやフォルダの名前を変える (ren)</button>
+            <button class="item-btn" data-type="list-files">中身の一覧を見る (dir/ls)</button>
+            <button class="item-btn" data-type="search-files">ファイルを探す</button>
+            <button class="item-btn" data-type="copy-file">ファイルをコピーする (copy)</button>
+            <button class="item-btn" data-type="read-file">ファイルの中身を画面で見る (type)</button>
+            <button class="item-btn" data-type="open-notepad">メモ帳で開いて編集する</button>
+            <button class="item-btn item-danger" data-type="delete-file">ファイルをゴミ箱/削除 (del)</button>
+          </div>
+
+          <!-- インターネット・ネットワーク診断 -->
+          <div class="category">
+            <div class="category-name">インターネット・ネットワーク診断</div>
+            <button class="item-btn" data-type="show-ip">自分のIPアドレスを調べる (ipconfig)</button>
+            <button class="item-btn" data-type="check-port">ポート番号が使われているか調べる</button>
+            <button class="item-btn" data-type="network-ping">ネットが繋がるか調べる (ping)</button>
+            <button class="item-btn" data-type="trace-route">通信の通り道を調べる (tracert)</button>
+            <button class="item-btn" data-type="web-download">ネットからファイルを保存する</button>
+            <button class="item-btn" data-type="web-api">Webからデータを取ってくる (API)</button>
+          </div>
+
+          <!-- パソコンの状態と電源 -->
+          <div class="category">
+            <div class="category-name">パソコンの状態と電源</div>
+            <button class="item-btn" data-type="system-info">パソコンの詳しい情報を見る (systeminfo)</button>
+            <button class="item-btn" data-type="process-list">今動いているアプリ一覧</button>
+            <button class="item-btn" data-type="timer-shutdown">指定時間後に電源を切る/再起動 (shutdown)</button>
+          </div>
+
+          <!-- 頭脳・繰り返し・対話 -->
           <div class="category">
             <div class="category-name">頭脳・繰り返し・対話</div>
-            <button class="item-btn highlight" data-type="prompt-input">人に質問して文字を入力してもらう</button>
+            <button class="item-btn" data-type="prompt-input">人に質問して文字を入力してもらう</button>
             <button class="item-btn" data-type="loop-count">〇回繰り返す (指定回数)</button>
             <button class="item-btn" data-type="foreach-loop">1行ずつ同じ処理を繰り返す</button>
             <button class="item-btn" data-type="condition-if">もし〜なら／そうでなければ (If/Else)</button>
@@ -100,51 +147,24 @@
             <button class="item-btn" data-type="custom-command">自由に入力して動かす (何でも)</button>
           </div>
 
-          <!-- ファイル・フォルダ -->
-          <div class="category">
-            <div class="category-name">ファイルとフォルダ</div>
-            <button class="item-btn" data-type="read-file">ファイルの中身を画面で見る</button>
-            <button class="item-btn" data-type="open-notepad">メモ帳で開いて編集する</button>
-            <button class="item-btn" data-type="list-files">中身の一覧を見る</button>
-            <button class="item-btn" data-type="search-files">ファイルを探す</button>
-            <button class="item-btn" data-type="copy-file">ファイルをコピーする</button>
-            <button class="item-btn item-danger" data-type="delete-file">ファイルをゴミ箱/削除</button>
-          </div>
-
-          <!-- 圧縮・解凍 (Zip) -->
+          <!-- Zipの圧縮と解凍 -->
           <div class="category">
             <div class="category-name">Zipの圧縮と解凍</div>
             <button class="item-btn" data-type="zip-compress">フォルダをZipにまとめる (圧縮)</button>
             <button class="item-btn" data-type="zip-extract">Zipを開いて取り出す (解凍)</button>
           </div>
 
-          <!-- ネット・通信 -->
-          <div class="category">
-            <div class="category-name">インターネット・通信</div>
-            <button class="item-btn" data-type="check-port">ポート番号が使われているか調べる</button>
-            <button class="item-btn" data-type="web-download">ネットからファイルを保存する</button>
-            <button class="item-btn" data-type="web-api">Webからデータを取ってくる (API)</button>
-            <button class="item-btn" data-type="network-ping">ネットが繋がるか調べる (テスト)</button>
-          </div>
-
-          <!-- アプリ・ツールの追加 -->
+          <!-- 道具・プログラムの追加 -->
           <div class="category">
             <div class="category-name">道具・プログラムの追加</div>
             <button class="item-btn" data-type="pkg-install">必要なツールを入れる (インストール)</button>
           </div>
 
-          <!-- 文字・データ探し -->
+          <!-- 文字やデータの処理 -->
           <div class="category">
             <div class="category-name">文字やデータの処理</div>
-            <button class="item-btn" data-type="search-text">ファイルの中から文字を探す</button>
+            <button class="item-btn" data-type="search-text">ファイルの中から文字を探す (find)</button>
             <button class="item-btn" data-type="count-lines">行の数や文字数を数える</button>
-          </div>
-
-          <!-- パソコンの情報 -->
-          <div class="category">
-            <div class="category-name">パソコンの状態</div>
-            <button class="item-btn" data-type="system-info">パソコンの基本情報を見る</button>
-            <button class="item-btn" data-type="process-list">今動いているアプリを見る</button>
           </div>
 
           <!-- バージョン管理 (Git) -->
