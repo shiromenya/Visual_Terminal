@@ -7,7 +7,8 @@ const os = require('node:os');
 
 let currentWorkingDir = process.cwd();
 const PORT = 3456;
-let activeProcess = null;
+const activeProcesses = new Map(); // runId -> childProcess (並列実行対応)
+let globalProcessCounter = 0;
 
 const isWindows = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
@@ -304,41 +305,68 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // プロセス中断 (Ctrl+C / Kill)
+  // プロセス中断 (Ctrl+C / Kill / 全停止対応)
   if (url.pathname === '/api/kill' && req.method === 'POST') {
-    if (activeProcess) {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
       try {
-        if (isWindows) {
-          spawn('taskkill', ['/pid', activeProcess.pid, '/f', '/t']);
-        } else {
-          activeProcess.kill('SIGKILL');
+        const { runId } = body ? JSON.parse(body) : {};
+        if (runId && activeProcesses.has(runId)) {
+          const proc = activeProcesses.get(runId);
+          if (isWindows) {
+            spawn('taskkill', ['/pid', proc.pid, '/f', '/t']);
+          } else {
+            proc.kill('SIGKILL');
+          }
+          activeProcesses.delete(runId);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, message: `プロセス (${runId}) を中断しました。` }));
+          return;
         }
-        activeProcess = null;
+
+        // runId未指定の場合は全稼働中プロセスを中断
+        if (activeProcesses.size > 0) {
+          activeProcesses.forEach((proc, id) => {
+            try {
+              if (isWindows) {
+                spawn('taskkill', ['/pid', proc.pid, '/f', '/t']);
+              } else {
+                proc.kill('SIGKILL');
+              }
+            } catch (e) {}
+          });
+          const count = activeProcesses.size;
+          activeProcesses.clear();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, message: `${count}件のプロセスをすべて中断しました。` }));
+          return;
+        }
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, message: 'プロセスを中断しました。' }));
-        return;
+        res.end(JSON.stringify({ ok: true, message: '実行中のプロセスはありません。' }));
       } catch (e) {
-        // ignore
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
       }
-    }
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, message: '実行中のプロセスはありません。' }));
+    });
     return;
   }
 
-  // コマンド実行 (ストリーミング対応 SSE / NDJSON)
+  // コマンド実行 (ストリーミング対応 SSE / NDJSON / 並行実行サポート)
   if (url.pathname === '/api/execute' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
       try {
-        const { script } = JSON.parse(body);
+        const { script, runId: reqRunId } = JSON.parse(body);
         if (!script) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'スクリプトが指定されていません。' }));
           return;
         }
 
+        const runId = reqRunId || `proc_${++globalProcessCounter}_${Date.now()}`;
         const startTime = Date.now();
 
         // リアルタイム・ストリーミング用のヘッダー
@@ -349,42 +377,45 @@ const server = http.createServer((req, res) => {
         });
 
         const sendEvent = (obj) => {
-          res.write(`data: ${JSON.stringify(obj)}\n\n`);
+          res.write(`data: ${JSON.stringify({ ...obj, runId })}\n\n`);
         };
 
+        let childProc = null;
         if (isWindows) {
           // Windows: PowerShell (UTF-8)
           const psCommand = `chcp 65001 >$null; $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${script}`;
-          activeProcess = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psCommand], {
+          childProc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psCommand], {
             cwd: currentWorkingDir,
             env: process.env
           });
         } else {
           // macOS / Linux: /bin/bash or /bin/zsh
           const shellBin = fs.existsSync('/bin/zsh') ? '/bin/zsh' : '/bin/bash';
-          activeProcess = spawn(shellBin, ['-c', script], {
+          childProc = spawn(shellBin, ['-c', script], {
             cwd: currentWorkingDir,
             env: { ...process.env, LANG: 'ja_JP.UTF-8' }
           });
         }
 
+        activeProcesses.set(runId, childProc);
+
         let fullStderr = '';
         let fullStdout = '';
 
-        activeProcess.stdout.on('data', data => {
+        childProc.stdout.on('data', data => {
           const text = data.toString('utf8');
           fullStdout += text;
           sendEvent({ type: 'stdout', text });
         });
 
-        activeProcess.stderr.on('data', data => {
+        childProc.stderr.on('data', data => {
           const text = data.toString('utf8');
           fullStderr += text;
           sendEvent({ type: 'stderr', text });
         });
 
-        activeProcess.on('close', code => {
-          activeProcess = null;
+        childProc.on('close', code => {
+          activeProcesses.delete(runId);
           const duration = ((Date.now() - startTime) / 1000).toFixed(2);
           const exitCode = code === null ? 1 : code;
           const explanation = explainError(fullStderr, exitCode, fullStdout);
@@ -399,8 +430,8 @@ const server = http.createServer((req, res) => {
           res.end();
         });
 
-        activeProcess.on('error', err => {
-          activeProcess = null;
+        childProc.on('error', err => {
+          activeProcesses.delete(runId);
           sendEvent({
             type: 'error',
             message: err.message
@@ -409,7 +440,80 @@ const server = http.createServer((req, res) => {
         });
 
       } catch (err) {
-        activeProcess = null;
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 🚀 ヘッドレスREST API / Webhookトリガー実行 (外部CLI・CI/CD・Cronから実行可能)
+  if (url.pathname === '/api/workflow/run' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const payload = body ? JSON.parse(body) : {};
+        const script = payload.script;
+        const targetDir = payload.workingDir || currentWorkingDir;
+
+        if (!script) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: 'スクリプト (script) が指定されていません。' }));
+          return;
+        }
+
+        const startTime = Date.now();
+        const runId = `headless_${++globalProcessCounter}_${Date.now()}`;
+
+        let childProc = null;
+        if (isWindows) {
+          const psCommand = `chcp 65001 >$null; $OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${script}`;
+          childProc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psCommand], {
+            cwd: targetDir,
+            env: process.env
+          });
+        } else {
+          const shellBin = fs.existsSync('/bin/zsh') ? '/bin/zsh' : '/bin/bash';
+          childProc = spawn(shellBin, ['-c', script], {
+            cwd: targetDir,
+            env: { ...process.env, LANG: 'ja_JP.UTF-8' }
+          });
+        }
+
+        activeProcesses.set(runId, childProc);
+
+        let fullStdout = '';
+        let fullStderr = '';
+
+        childProc.stdout.on('data', data => fullStdout += data.toString('utf8'));
+        childProc.stderr.on('data', data => fullStderr += data.toString('utf8'));
+
+        childProc.on('close', code => {
+          activeProcesses.delete(runId);
+          const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+          const exitCode = code === null ? 1 : code;
+          const explanation = explainError(fullStderr, exitCode, fullStdout);
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            ok: exitCode === 0,
+            exitCode,
+            duration: `${duration}s`,
+            stdout: fullStdout,
+            stderr: fullStderr,
+            explanation,
+            timestamp: new Date().toISOString()
+          }));
+        });
+
+        childProc.on('error', err => {
+          activeProcesses.delete(runId);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: false, error: err.message }));
+        });
+
+      } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: err.message }));
       }

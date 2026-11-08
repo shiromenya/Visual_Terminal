@@ -37,6 +37,29 @@
           <svg class="ui-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
           <span>履歴</span>
         </button>
+        <button id="btnWorkflowSnapshots" class="btn btn-default" title="世代スナップショット・差分Diff復元">
+          <svg class="ui-icon" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <span>バージョン履歴</span>
+        </button>
+        <button id="btnWebhookModal" class="btn btn-default" title="外部CI/CDやCronから実行できるWebhook/API連携">
+          <svg class="ui-icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          <span>外部連携(API)</span>
+        </button>
+        <div class="divider"></div>
+        <div class="profile-selector-group" title="環境プロファイル（接続先や変数セットを一括切り替え）">
+          <span class="profile-label">Env:</span>
+          <select id="profileSelect" class="form-select profile-select">
+            <option value="local">🌐 Local</option>
+            <option value="staging">🟡 Staging</option>
+            <option value="production">🔴 Production</option>
+          </select>
+          <button id="btnManageProfiles" class="btn-profile-edit" title="プロファイル変数を編集">⚙️</button>
+        </div>
+        <div class="divider"></div>
+        <label class="checkbox-label" title="DAG結線で分岐した独立ノードを同時に並列実行します">
+          <input type="checkbox" id="toggleParallelDag">
+          <span>並列実行 (Parallel)</span>
+        </label>
         <div class="divider"></div>
         <label class="checkbox-label" title="途中で失敗したらそれ以降のブロックを動かさず安全に止めます">
           <input type="checkbox" id="toggleStopOnError" checked>
@@ -118,12 +141,16 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">よく使う基本操作</span>
               </div>
-              <span class="acc-count">8</span>
+              <span class="acc-count">9</span>
             </summary>
             <div class="acc-content">
               <button class="item-btn highlight" data-type="list-files">
                 <span class="item-label">中身の一覧を見る</span>
                 <span class="item-cmd">dir / ls</span>
+              </button>
+              <button class="item-btn highlight" data-type="condition-if">
+                <span class="item-label">もし〜なら (If/Else条件分岐)</span>
+                <span class="item-cmd">if / else</span>
               </button>
               <button class="item-btn highlight" data-type="make-dir">
                 <span class="item-label">新しいフォルダを作る</span>
@@ -902,8 +929,9 @@
             <span class="step-status"><strong id="stepCurrentNum">1</strong> / <span id="stepTotalNum">0</span> : <span id="stepBlockName">-</span></span>
           </div>
           <div class="step-actions">
-            <button id="btnStepNext" class="btn btn-primary">次へ進む</button>
-            <button id="btnStepStop" class="btn btn-default">中断</button>
+            <button id="btnStepResume" class="btn btn-primary" style="background-color: #10b981; border-color: #10b981;" title="ブレークポイントから最後まで一括再開">再開 ▶</button>
+            <button id="btnStepNext" class="btn btn-default" title="次の1ステップだけ実行">次へ進む ⏭️</button>
+            <button id="btnStepStop" class="btn btn-default" title="ステップ実行を中断">中断 ⏹️</button>
           </div>
         </div>
 
@@ -920,6 +948,10 @@
               <button id="btnDiagnoseLog" class="btn btn-subtle hidden" title="エラーの原因と仕組みを解説します">
                 <svg class="ui-icon sm" style="stroke: #ef4444;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 <span>エラー解説</span>
+              </button>
+              <button id="btnOpenProfiler" class="btn btn-subtle hidden" title="各ブロックの実行所要時間とボトルネックを可視化">
+                <svg class="ui-icon sm" style="stroke: #38bdf8;" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                <span>プロファイラー</span>
               </button>
               <button id="btnCopyLog" class="btn btn-subtle">結果をコピー</button>
               <button id="btnClearLog" class="btn btn-subtle">画面をきれいにする</button>
@@ -940,14 +972,42 @@
     <div class="dialog catalog-dialog">
       <div class="dialog-header-row">
         <div>
-          <div class="dialog-title">Windows全コマンド図鑑（逆引きカタログ）</div>
+          <div class="dialog-title">Windows全コマンド図鑑（Microsoft公式 A〜Z 逆引きカタログ）</div>
           <div class="dialog-desc">やりたいことから探して、クリックするだけでブロックとして追加できます。</div>
         </div>
         <button id="btnCatalogClose" class="btn btn-default">閉じる</button>
       </div>
-      <div class="catalog-search-bar">
-        <input type="text" id="catalogSearchInput" class="search-input" placeholder="やりたいことや機能名で検索 (例: 暗号化, Wi-Fi, メディア, ディスク, 復元...)">
+
+      <!-- カテゴリタブ -->
+      <div class="catalog-category-tabs" id="catalogCategoryTabs">
+        <button class="cat-tab active" data-cat="all">🌈 すべて (300+)</button>
+        <button class="cat-tab" data-cat="popular">🌟 おすすめ日常</button>
+        <button class="cat-tab" data-cat="file">📁 ファイル・データ</button>
+        <button class="cat-tab" data-cat="network">🌐 ネットワーク・通信</button>
+        <button class="cat-tab" data-cat="system">💻 システム・PC診断</button>
+        <button class="cat-tab" data-cat="disk">💾 ディスク・記憶域</button>
+        <button class="cat-tab" data-cat="user">👥 ユーザー・アカウント</button>
+        <button class="cat-tab" data-cat="security">🛡️ セキュリティ・暗号</button>
+        <button class="cat-tab" data-cat="admin">⚙️ 管理・サーバー・AD</button>
+        <button class="cat-tab" data-cat="script">📜 スクリプト・自動化</button>
       </div>
+
+      <!-- 検索バー -->
+      <div class="catalog-search-bar">
+        <input type="text" id="catalogSearchInput" class="search-input" placeholder="やりたいこと・コマンド名・キーワードで高速検索 (例: 暗号化, Wi-Fi, DNS, cipher, ハッシュ, 修復...)">
+      </div>
+
+      <!-- サブフィルター (権限・難易度) -->
+      <div class="catalog-subfilter-bar">
+        <div class="level-filters">
+          <label><input type="radio" name="catalogLevel" value="all" checked> すべて</label>
+          <label><input type="radio" name="catalogLevel" value="beginner"> 🔰 初心者安心 (情報取得・安全)</label>
+          <label><input type="radio" name="catalogLevel" value="admin"> ⚙️ 要管理者権限</label>
+          <label><input type="radio" name="catalogLevel" value="caution"> ⚠️ 破壊的注意</label>
+        </div>
+        <div class="catalog-count-badge" id="catalogCountBadge">読み込み中...</div>
+      </div>
+
       <div class="catalog-grid" id="catalogGrid">
         <!-- JSで全コマンドカードを動的生成 -->
       </div>
@@ -1170,6 +1230,137 @@
     </div>
   </div>
 
+  <!-- 🌐 環境プロファイル管理モーダル (Local / Staging / Production) -->
+  <div id="profileModal" class="modal-backdrop hidden">
+    <div class="dialog profile-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">環境プロファイル管理 (Environments)</div>
+          <div class="dialog-desc">本番・検証・ローカル環境ごとに異なる接続先URLや設定値を一括管理・ワンクリック切り替えできます。</div>
+        </div>
+        <button id="btnProfileClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div class="dialog-body">
+        <div class="profile-tabs-bar" id="profileTabsBar">
+          <!-- プロファイルタブ (Local, Staging, Production等) -->
+        </div>
+        <div class="profile-editor-container">
+          <div class="profile-env-header">
+            <span style="font-weight: 600;">このプロファイルの変数一覧:</span>
+            <span class="text-subtle" style="font-size: 11px;">※ ブロック内で {変数名} と書くと自動置換されます</span>
+          </div>
+          <div class="profile-add-row">
+            <input type="text" id="profileVarKey" class="form-input" placeholder="変数名 (例: HOST, PORT, DB_URL)">
+            <input type="text" id="profileVarVal" class="form-input" placeholder="設定値 (例: 127.0.0.1, 5432)">
+            <button id="btnAddProfileVar" class="btn btn-primary">+ 追加</button>
+          </div>
+          <div id="profileVarsList" class="profile-vars-list">
+            <!-- 変数一覧テーブル -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📊 実行プロファイラーモーダル (ボトルネック・ウォーターフォール可視化) -->
+  <div id="profilerModal" class="modal-backdrop hidden">
+    <div class="dialog profiler-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">実行プロファイラー (Performance Profiler)</div>
+          <div class="dialog-desc">各ステップの所要時間と全体のボトルネックをウォーターフォールチャートで精密可視化します。</div>
+        </div>
+        <button id="btnProfilerClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div class="dialog-body">
+        <div class="profiler-summary-bar">
+          <div class="prof-stat-box">
+            <span class="prof-stat-label">総所要時間</span>
+            <span id="profTotalDuration" class="prof-stat-value">-</span>
+          </div>
+          <div class="prof-stat-box">
+            <span class="prof-stat-label">ステップ数</span>
+            <span id="profStepCount" class="prof-stat-value">0</span>
+          </div>
+          <div class="prof-stat-box">
+            <span class="prof-stat-label">最大ボトルネック</span>
+            <span id="profBottleneckName" class="prof-stat-value text-danger">-</span>
+          </div>
+        </div>
+        <div id="profilerTimeline" class="profiler-timeline-container">
+          <!-- タイムラインバーが動的生成される -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⏱ バージョン履歴 & 差分Diffモーダル (スナップショット復元) -->
+  <div id="snapshotModal" class="modal-backdrop hidden">
+    <div class="dialog snapshot-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">バージョン履歴 & 差分Diff</div>
+          <div class="dialog-desc">過去の編集履歴スナップショットをGit風の差分で比較し、いつでも復元できます。</div>
+        </div>
+        <button id="btnSnapshotClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div class="dialog-body snapshot-layout">
+        <div class="snapshot-sidebar">
+          <div class="snapshot-sidebar-title">履歴一覧 (最大30世代)</div>
+          <div id="snapshotList" class="snapshot-list">
+            <!-- 世代一覧リスト -->
+          </div>
+        </div>
+        <div class="snapshot-diff-viewer">
+          <div class="diff-viewer-header">
+            <span id="diffViewerTitle" style="font-weight: 600;">現在のワークフローとの差分</span>
+            <button id="btnRestoreSnapshot" class="btn btn-primary" style="display: none;">このバージョンに復元する</button>
+          </div>
+          <div id="snapshotDiffContent" class="diff-content-panel">
+            <div class="text-subtle" style="padding: 20px; text-align: center;">左のリストから履歴を選択してください</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔗 外部連携 (Webhook / REST API) モーダル -->
+  <div id="webhookModal" class="modal-backdrop hidden">
+    <div class="dialog webhook-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">外部自動連携 (Webhook / REST API)</div>
+          <div class="dialog-desc">外部のGitHub Actions、Jenkins、Cron、別スクリプトからこのワークフローを叩けるスニペットです。</div>
+        </div>
+        <button id="btnWebhookClose" class="btn btn-default">閉じる</button>
+      </div>
+      <div class="dialog-body">
+        <div class="webhook-snippet-group">
+          <div class="snippet-header">
+            <span class="snippet-title">cURL (Linux / macOS / Bash / CI/CD)</span>
+            <button class="btn btn-tiny btn-copy-snippet" data-target="snippetCurl">コピー</button>
+          </div>
+          <pre id="snippetCurl" class="snippet-code"></pre>
+        </div>
+        <div class="webhook-snippet-group" style="margin-top: 14px;">
+          <div class="snippet-header">
+            <span class="snippet-title">PowerShell (Windows / タスクスケジューラ)</span>
+            <button class="btn btn-tiny btn-copy-snippet" data-target="snippetPwsh">コピー</button>
+          </div>
+          <pre id="snippetPwsh" class="snippet-code"></pre>
+        </div>
+        <div class="webhook-snippet-group" style="margin-top: 14px;">
+          <div class="snippet-header">
+            <span class="snippet-title">Python (Requests)</span>
+            <button class="btn btn-tiny btn-copy-snippet" data-target="snippetPython">コピー</button>
+          </div>
+          <pre id="snippetPython" class="snippet-code"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="windows_commands_data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -4,6 +4,18 @@ let currentPlatform = navigator.userAgent.includes('Mac') ? 'darwin' : 'win32';
 let lastUserInput = '';
 let userSecrets = {};
 
+// 🌐 環境プロファイル (Environments)
+let currentProfile = 'local';
+let userProfiles = {
+  local: { HOST: '127.0.0.1', PORT: '3000', ENV: 'development' },
+  staging: { HOST: 'stg.example.com', PORT: '8080', ENV: 'staging' },
+  production: { HOST: 'api.example.com', PORT: '443', ENV: 'production' }
+};
+
+// ⛓️ データパイプライン & プロファイラーキャッシュ
+let lastBlockOutputs = []; // 各ブロックの標準出力 (文字列)
+let executionProfilingData = []; // 各ブロックの実行所要時間メトリクス
+
 function loadSecrets() {
   try {
     const s = localStorage.getItem('graphical_terminal_secrets');
@@ -17,11 +29,25 @@ function saveSecrets() {
   localStorage.setItem('graphical_terminal_secrets', JSON.stringify(userSecrets));
 }
 
+function loadProfiles() {
+  try {
+    const p = localStorage.getItem('graphical_terminal_profiles');
+    if (p) userProfiles = JSON.parse(p);
+    const cp = localStorage.getItem('graphical_terminal_current_profile');
+    if (cp && userProfiles[cp]) currentProfile = cp;
+  } catch (e) {}
+}
+
+function saveProfiles() {
+  localStorage.setItem('graphical_terminal_profiles', JSON.stringify(userProfiles));
+  localStorage.setItem('graphical_terminal_current_profile', currentProfile);
+}
+
 function isUnix() {
   return currentPlatform === 'darwin' || currentPlatform === 'linux';
 }
 
-function resolveVariables(str) {
+function resolveVariables(str, blockIndex, incomingOutput) {
   if (!str) return '';
   const now = new Date();
   const yyyy = now.getFullYear();
@@ -38,6 +64,27 @@ function resolveVariables(str) {
     .replaceAll('{now}', nowStr)
     .replaceAll('{input}', lastUserInput);
 
+  // ⛓️ データパイプライン変数: {output} や {prev}
+  let prevOut = incomingOutput;
+  if (prevOut === undefined && typeof blockIndex === 'number' && blockIndex > 0) {
+    prevOut = lastBlockOutputs[blockIndex - 1] || '';
+  }
+  if (prevOut !== undefined) {
+    res = res.replaceAll('{output}', prevOut).replaceAll('{prev}', prevOut);
+  }
+
+  // 特定ステップ出力: {output:1}, {output:Step 1}
+  res = res.replace(/\{output:(?:Step\s*)?(\d+)\}/gi, (match, stepNum) => {
+    const sIdx = parseInt(stepNum) - 1;
+    return (sIdx >= 0 && lastBlockOutputs[sIdx]) ? lastBlockOutputs[sIdx] : '';
+  });
+
+  // 🌐 環境プロファイル変数の自動置換
+  const activeProfileVars = userProfiles[currentProfile] || {};
+  for (const [k, v] of Object.entries(activeProfileVars)) {
+    if (k) res = res.replaceAll(`{${k}}`, v);
+  }
+
   // 🔑 登録された秘密変数・環境変数の自動置換
   for (const [k, v] of Object.entries(userSecrets)) {
     if (k) {
@@ -50,6 +97,70 @@ function resolveVariables(str) {
 
 // 📖 全コマンド図鑑データベース（Microsoft公式 Windows Commands 逆引き集）
 const COMMAND_CATALOG = [
+  {
+    id: 'condition-if',
+    name: 'もし〜なら (条件分岐 If/Else)',
+    cmd: 'if / else',
+    category: 'script',
+    level: 'beginner',
+    desc: '「直前のコマンドが成功したら」「出力に特定文字が含まれたら」などの条件で、実行するコマンドを分岐します。',
+    fields: [
+      { id: 'condition', label: '分岐する条件', type: 'select', default: 'success', options: [
+        { value: 'success', label: '前のコマンドが成功した時 (ExitCode = 0)' },
+        { value: 'failed', label: '前のコマンドが失敗・エラーの時' },
+        { value: 'contains', label: '前の出力に特定の文字が含まれる時' }
+      ]},
+      { id: 'keyword', label: '判定するキーワード (文字が含まれる時の場合)', type: 'text', placeholder: '例: ERROR や SUCCESS', default: '' },
+      { id: 'thenCmd', label: '条件に当てはまる時に動かす命令', type: 'text', placeholder: '例: echo OK!', default: 'echo "条件に一致しました"' },
+      { id: 'elseCmd', label: '当てはまらない時に動かす命令 (任意)', type: 'text', placeholder: '例: echo NG...', default: '' }
+    ],
+    generateCommand: (params, blockIndex, incomingOutput) => {
+      const cond = params.condition || 'success';
+      const thenCmd = resolveVariables(params.thenCmd || 'echo OK', blockIndex, incomingOutput);
+      const elseCmd = resolveVariables(params.elseCmd || '', blockIndex, incomingOutput);
+      const kw = resolveVariables(params.keyword || '', blockIndex, incomingOutput);
+      if (isUnix()) {
+        if (cond === 'success') {
+          return elseCmd ? `if [ $? -eq 0 ]; then ${thenCmd}; else ${elseCmd}; fi` : `if [ $? -eq 0 ]; then ${thenCmd}; fi`;
+        } else if (cond === 'failed') {
+          return elseCmd ? `if [ $? -ne 0 ]; then ${thenCmd}; else ${elseCmd}; fi` : `if [ $? -ne 0 ]; then ${thenCmd}; fi`;
+        } else {
+          return `if echo "$PREV_OUTPUT" | grep -q "${kw}"; then ${thenCmd}; ${elseCmd ? 'else ' + elseCmd + '; ' : ''}fi`;
+        }
+      } else {
+        if (cond === 'success') {
+          return elseCmd ? `if ($LASTEXITCODE -eq 0) { ${thenCmd} } else { ${elseCmd} }` : `if ($LASTEXITCODE -eq 0) { ${thenCmd} }`;
+        } else if (cond === 'failed') {
+          return elseCmd ? `if ($LASTEXITCODE -ne 0) { ${thenCmd} } else { ${elseCmd} }` : `if ($LASTEXITCODE -ne 0) { ${thenCmd} }`;
+        } else {
+          return `if ($LAST_OUTPUT -like "*${kw}*") { ${thenCmd} } ${elseCmd ? 'else { ' + elseCmd + ' }' : ''}`;
+        }
+      }
+    }
+  },
+  {
+    id: 'if-file-exists',
+    name: 'ファイルが存在するかどうかで分岐 (Test-Path)',
+    cmd: 'test-path',
+    category: 'script',
+    level: 'beginner',
+    desc: '指定したファイルやフォルダが存在するかどうかを確認し、存在する場合/しない場合で処理を切り替えます。',
+    fields: [
+      { id: 'path', label: '確認したいファイルやフォルダの場所', type: 'text', placeholder: '例: ./config.json または C:\\data.txt', default: '' },
+      { id: 'thenCmd', label: '存在した時に動かす命令', type: 'text', placeholder: '例: echo ファイルが見つかりました', default: 'echo "ファイルが存在します"' },
+      { id: 'elseCmd', label: '存在しなかった時に動かす命令', type: 'text', placeholder: '例: echo ファイルがありません', default: 'echo "ファイルが存在しません"' }
+    ],
+    generateCommand: (params, blockIndex, incomingOutput) => {
+      const p = resolveVariables(params.path || '', blockIndex, incomingOutput);
+      const thenCmd = resolveVariables(params.thenCmd || 'echo Found', blockIndex, incomingOutput);
+      const elseCmd = resolveVariables(params.elseCmd || '', blockIndex, incomingOutput);
+      if (isUnix()) {
+        return elseCmd ? `if [ -e "${p}" ]; then ${thenCmd}; else ${elseCmd}; fi` : `if [ -e "${p}" ]; then ${thenCmd}; fi`;
+      } else {
+        return elseCmd ? `if (Test-Path "${p}") { ${thenCmd} } else { ${elseCmd} }` : `if (Test-Path "${p}") { ${thenCmd} }`;
+      }
+    }
+  },
   {
     id: 'wifi-password',
     name: '保存済みWi-Fiのパスワードを調べる',
@@ -2288,7 +2399,55 @@ function saveUserBlock(id, def) {
 }
 
 function getBlockDef(type) {
-  return BUILTIN_BLOCKS[type] || userBlocks[type];
+  return BUILTIN_BLOCKS[type] || userBlocks[type] || getCatalogCommandBlockDef(type);
+}
+
+// 📖 Microsoft公式Windowsコマンド動的ブロック定義ジェネレーター
+function getCatalogCommandBlockDef(type) {
+  const master = getAllCatalogCommands();
+  const item = master.find(c => c.id === type || c.cmd === type || ('cmd_' + c.cmd.toLowerCase().replace(/[^a-z0-9_-]/g, '_')) === type);
+  if (!item) return null;
+
+  const presets = item.presets || [];
+  const presetOptions = presets.map((p, idx) => ({ value: String(idx), label: p.label }));
+
+  const fields = [];
+  if (presetOptions.length > 0) {
+    fields.push({
+      id: '_preset',
+      label: '▼ よく使うおすすめ設定から選ぶ',
+      type: 'select',
+      options: [
+        { value: 'custom', label: '手動で自由に引数を指定' },
+        ...presetOptions
+      ],
+      default: '0'
+    });
+  }
+
+  fields.push({
+    id: 'args',
+    label: 'コマンド引数・オプション',
+    type: 'text',
+    placeholder: '例: ' + (item.defaultArgs || '引数や {output} を指定'),
+    default: (presets[0] && presets[0].args !== undefined) ? presets[0].args : (item.defaultArgs || '')
+  });
+
+  return {
+    id: type,
+    name: item.name,
+    category: item.category || 'system',
+    badge: item.cmd,
+    level: item.level || 'beginner',
+    desc: item.desc,
+    msDoc: item.url || ('https://learn.microsoft.com/ja-jp/windows-server/administration/windows-commands/' + item.cmd),
+    _rawPresets: presets,
+    fields: fields,
+    generateCommand: (params, blockIndex, incomingOutput) => {
+      const a = resolveVariables(params.args || '', blockIndex, incomingOutput).trim();
+      return `${item.cmd}${a ? ' ' + a : ''}`;
+    }
+  };
 }
 
 // プリセット
@@ -2913,6 +3072,7 @@ function initTheme() {
 async function init() {
   initTheme();
   loadSecrets();
+  loadProfiles();
   document.body.classList.add('show-commands');
   loadUserBlocks();
   await fetchCwd();
@@ -2920,6 +3080,10 @@ async function init() {
   syncFromActiveTab();
   renderWorkflowTabs();
   setupEventListeners();
+  initProfileControls();
+  initProfilerControls();
+  initSnapshotControls();
+  initWebhookControls();
   renderCatalogGrid('');
   loadPreset('date-backup');
 }
@@ -3006,31 +3170,148 @@ async function fetchCwd() {
 }
 
 // 📖 全コマンド図鑑のカード描画
-function renderCatalogGrid(query = '') {
-  catalogGrid.innerHTML = '';
-  const q = query.toLowerCase().trim();
 
-  COMMAND_CATALOG.forEach(item => {
-    const match = !q || item.name.toLowerCase().includes(q) || item.cmd.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+// 📖 全コマンド図鑑のマスターキャッシュ
+let _allCatalogCommandsCache = null;
+let currentCatalogCategory = 'all';
+let currentCatalogLevel = 'all';
+
+function getAllCatalogCommands() {
+  if (_allCatalogCommandsCache) return _allCatalogCommandsCache;
+
+  const list = [];
+  const seenCmds = new Set();
+
+  // ① 既存の日常おすすめレシピ (COMMAND_CATALOG)
+  if (Array.isArray(COMMAND_CATALOG)) {
+    COMMAND_CATALOG.forEach(item => {
+      const cmdKey = (item.cmd || '').toLowerCase().trim();
+      seenCmds.add(cmdKey);
+      list.push({
+        ...item,
+        isPopular: true,
+        level: item.level || 'beginner'
+      });
+    });
+  }
+
+  // ② Microsoft公式 Windows Commands (window.WINDOWS_ALL_COMMANDS)
+  const msList = (typeof window !== 'undefined' && window.WINDOWS_ALL_COMMANDS) ? window.WINDOWS_ALL_COMMANDS : [];
+  msList.forEach(m => {
+    const cmdKey = (m.cmd || '').toLowerCase().trim();
+    const id = 'cmd_' + cmdKey.replace(/[^a-z0-9_-]/g, '_');
+    
+    // 既存レシピと重複しない場合のみ追加
+    if (!seenCmds.has(cmdKey)) {
+      seenCmds.add(cmdKey);
+      list.push({
+        id: id,
+        name: m.name,
+        cmd: m.cmd,
+        category: m.category || 'system',
+        level: m.level || 'beginner',
+        desc: m.desc,
+        url: m.url,
+        presets: m.presets || [],
+        defaultArgs: m.defaultArgs || '',
+        isPopular: false
+      });
+    }
+  });
+
+  _allCatalogCommandsCache = list;
+  return list;
+}
+
+// 📖 全コマンド図鑑のカード描画 (カテゴリ & 権限 & 全文検索対応)
+function renderCatalogGrid(query = '') {
+  const grid = document.getElementById('catalogGrid');
+  const countBadge = document.getElementById('catalogCountBadge');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const q = query.toLowerCase().trim();
+  const allCmds = getAllCatalogCommands();
+
+  let matchedCount = 0;
+
+  allCmds.forEach(item => {
+    // 1. カテゴリフィルタ
+    if (currentCatalogCategory !== 'all') {
+      if (currentCatalogCategory === 'popular') {
+        if (!item.isPopular) return;
+      } else if (item.category !== currentCatalogCategory) {
+        return;
+      }
+    }
+
+    // 2. 権限・難易度フィルタ
+    if (currentCatalogLevel !== 'all') {
+      if (item.level !== currentCatalogLevel) return;
+    }
+
+    // 3. 検索クエリ
+    const match = !q || 
+      item.name.toLowerCase().includes(q) || 
+      (item.cmd && item.cmd.toLowerCase().includes(q)) || 
+      (item.desc && item.desc.toLowerCase().includes(q));
     if (!match) return;
+
+    matchedCount++;
 
     const card = document.createElement('div');
     card.className = 'catalog-card';
+
+    // 難易度バッジ
+    let levelBadgeHtml = '';
+    if (item.level === 'admin') {
+      levelBadgeHtml = '<span class="catalog-level-badge level-admin">⚙️ 要管理者</span>';
+    } else if (item.level === 'caution') {
+      levelBadgeHtml = '<span class="catalog-level-badge level-caution">⚠️ 破壊的注意</span>';
+    } else {
+      levelBadgeHtml = '<span class="catalog-level-badge level-beginner">🔰 初心者安心</span>';
+    }
+
+    // 公式解説URLリンク
+    const docUrl = item.url || (item.cmd ? `https://learn.microsoft.com/ja-jp/windows-server/administration/windows-commands/${item.cmd}` : '');
+    const docLinkHtml = docUrl
+      ? `<a href="${docUrl}" target="_blank" rel="noopener noreferrer" class="catalog-doc-link" title="Microsoft公式解説を開く" onclick="event.stopPropagation()">📖 公式解説</a>`
+      : '';
+
     card.innerHTML = `
       <div class="catalog-card-header">
-        <span class="catalog-card-title">${item.name}</span>
-        <span class="catalog-cmd-badge">${item.cmd}</span>
+        <span class="catalog-card-title" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+        <span class="catalog-cmd-badge">${escapeHtml(item.cmd || '')}</span>
       </div>
-      <div class="catalog-card-desc">${item.desc}</div>
+      <div class="catalog-card-desc">${escapeHtml(item.desc || '')}</div>
+      <div class="catalog-card-footer">
+        ${levelBadgeHtml}
+        ${docLinkHtml}
+      </div>
     `;
 
     card.addEventListener('click', () => {
       addBlock(item.id);
-      catalogModal.classList.add('hidden');
+      const modal = document.getElementById('catalogModal');
+      if (modal) modal.classList.add('hidden');
     });
 
-    catalogGrid.appendChild(card);
+    grid.appendChild(card);
   });
+
+  if (countBadge) {
+    countBadge.textContent = `${matchedCount} 件表示中`;
+  }
+
+  if (matchedCount === 0) {
+    const emptyMsg = document.createElement('div');
+    emptyMsg.style.gridColumn = '1 / -1';
+    emptyMsg.style.padding = '40px 20px';
+    emptyMsg.style.textAlign = 'center';
+    emptyMsg.style.color = '#94a3b8';
+    emptyMsg.innerHTML = '<p style="font-size: 14px; margin-bottom: 6px;">一致するコマンドが見つかりませんでした。</p><span style="font-size: 11px;">検索ワードを変えるか、カテゴリを「すべて」に切り替えてみてください。</span>';
+    grid.appendChild(emptyMsg);
+  }
 }
 
 // ユーザー作成ブロックの描画
@@ -3077,6 +3358,28 @@ function setupEventListeners() {
 
   catalogSearchInput.addEventListener('input', (e) => {
     renderCatalogGrid(e.target.value);
+  });
+
+  // カテゴリタブ切り替え
+  const catTabs = document.querySelectorAll('#catalogCategoryTabs .cat-tab');
+  catTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      catTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentCatalogCategory = tab.getAttribute('data-cat') || 'all';
+      renderCatalogGrid(catalogSearchInput ? catalogSearchInput.value : '');
+    });
+  });
+
+  // 権限・難易度ラジオ切り替え
+  const levelRadios = document.querySelectorAll('input[name="catalogLevel"]');
+  levelRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        currentCatalogLevel = e.target.value;
+        renderCatalogGrid(catalogSearchInput ? catalogSearchInput.value : '');
+      }
+    });
   });
 
   // すべて開く / すべて閉じるボタン
@@ -3175,6 +3478,14 @@ function setupEventListeners() {
   }
   if (btnStepNext) {
     btnStepNext.addEventListener('click', executeNextStep);
+  }
+  const btnStepResume = document.getElementById('btnStepResume');
+  if (btnStepResume) {
+    btnStepResume.addEventListener('click', () => {
+      if (stepControlBar) stepControlBar.classList.add('hidden');
+      isStepRunning = false;
+      executeWorkflowAdvanced({ startFromIndex: currentStepIndex });
+    });
   }
   if (btnStepStop) {
     btnStepStop.addEventListener('click', stopStepRun);
@@ -3437,6 +3748,7 @@ function setupEventListeners() {
 
   // プロセス中断ボタン
   btnStopProcess.addEventListener('click', async () => {
+    isWorkflowRunning = false;
     try {
       await fetch('/api/kill', { method: 'POST' });
       statusBadge.className = 'status-indicator error';
@@ -3635,21 +3947,29 @@ function loadPreset(key) {
   });
 }
 
-function generateBlockCommand(b) {
+function generateBlockCommand(b, blockIndex, incomingOutput) {
   const def = getBlockDef(b.type);
   if (!def) return '';
 
+  // パラメータ内の変数を解決したコピーを作成
+  const resolvedParams = {};
+  if (b.params) {
+    for (const [k, v] of Object.entries(b.params)) {
+      resolvedParams[k] = typeof v === 'string' ? resolveVariables(v, blockIndex, incomingOutput) : v;
+    }
+  }
+
   if (def.generateCommand) {
-    return def.generateCommand(b.params);
+    return def.generateCommand(resolvedParams);
   }
 
   if (def.template) {
     let cmd = def.template;
     def.fields.forEach(f => {
-      const val = resolveVariables(b.params[f.id]) || '';
+      const val = resolveVariables(resolvedParams[f.id], blockIndex, incomingOutput) || '';
       cmd = cmd.replaceAll(`{${f.id}}`, val);
     });
-    return resolveVariables(cmd);
+    return resolveVariables(cmd, blockIndex, incomingOutput);
   }
 
   return '';
@@ -3725,7 +4045,7 @@ function renderCanvas() {
       card.classList.add('card-danger');
     }
 
-    // ヘッダー
+    // ヘッダー (ブレークポイント、ステップ番号、コントロール)
     const header = document.createElement('div');
     header.className = 'block-card-header';
     const statusText = b._status === 'running' 
@@ -3734,6 +4054,7 @@ function renderCanvas() {
 
     header.innerHTML = `
       <div class="block-card-title">
+        <button class="breakpoint-btn ${b._breakpoint ? 'active' : ''}" title="ブレークポイント (実行時にここで一時停止)">●</button>
         <span class="drag-handle" title="ドラッグして並べ替え">⠿</span>
         <span class="block-name">${def.name}</span>
         <span class="block-status-badge ${b._status || 'idle'}">${statusText}</span>
@@ -3745,6 +4066,17 @@ function renderCanvas() {
         <button class="icon-btn btn-delete" title="消す">✕</button>
       </div>
     `;
+
+    // ブレークポイントトグル
+    const bpBtn = header.querySelector('.breakpoint-btn');
+    if (bpBtn) {
+      bpBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        b._breakpoint = !b._breakpoint;
+        bpBtn.classList.toggle('active', !!b._breakpoint);
+        syncToActiveTab();
+      });
+    }
 
     header.querySelector('.btn-up').addEventListener('click', () => moveBlock(index, -1));
     header.querySelector('.btn-down').addEventListener('click', () => moveBlock(index, 1));
@@ -3781,6 +4113,7 @@ function renderCanvas() {
         if (field.type === 'select') {
           input = document.createElement('select');
           input.className = 'form-select';
+          input.setAttribute('data-field-id', field.id);
           field.options.forEach(opt => {
             const option = document.createElement('option');
             option.value = opt.value;
@@ -3788,10 +4121,22 @@ function renderCanvas() {
             if (opt.value === b.params[field.id]) option.selected = true;
             input.appendChild(option);
           });
+          input.addEventListener('change', (e) => {
+            b.params[field.id] = e.target.value;
+            // プリセット変更時に args 入力欄を自動同期
+            if (field.id === '_preset' && def._rawPresets && def._rawPresets[Number(e.target.value)]) {
+              b.params['args'] = def._rawPresets[Number(e.target.value)].args;
+              const parentCard = input.closest('.block-card') || card;
+              const argsInput = parentCard ? parentCard.querySelector('input[data-field-id="args"]') : null;
+              if (argsInput) argsInput.value = b.params['args'];
+            }
+            updatePreview(card, b);
+          });
         } else {
           input = document.createElement('input');
           input.type = 'text';
           input.className = 'form-input';
+          input.setAttribute('data-field-id', field.id);
           input.placeholder = field.placeholder || '（ファイルをドラッグ＆ドロップでも入力可）';
           input.value = b.params[field.id] || '';
           setupFileDropOnInput(input, index, field.id);
@@ -3884,6 +4229,7 @@ function renderNodeGraph() {
 
     header.innerHTML = `
       <div class="flow-node-meta">
+        <button class="breakpoint-btn ${b._breakpoint ? 'active' : ''}" title="ブレークポイント (実行時にここで一時停止)">●</button>
         <span class="flow-node-step">Step ${index + 1}</span>
         <span class="flow-node-cmd">${def.cmd || def.category || 'cmd'}</span>
         <span class="block-status-badge ${b._status || 'idle'}">${statusText}</span>
@@ -3895,6 +4241,17 @@ function renderNodeGraph() {
         <button class="icon-btn btn-node-del" title="削除">✕</button>
       </div>
     `;
+
+    // ブレークポイントトグル
+    const bpBtn = header.querySelector('.breakpoint-btn');
+    if (bpBtn) {
+      bpBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        b._breakpoint = !b._breakpoint;
+        bpBtn.classList.toggle('active', !!b._breakpoint);
+        syncToActiveTab();
+      });
+    }
 
     // ノードの自由ドラッグ移動イベント
     header.addEventListener('mousedown', (e) => {
@@ -4565,7 +4922,7 @@ function checkDangerAndExecute() {
     return;
   }
 
-  executeScript(buildFullScript());
+  executeWorkflowAdvanced();
 }
 
 function downloadFile(content, filename, mimeType) {
@@ -4593,7 +4950,7 @@ function generateFormattedScript(format) {
 
     blocks.forEach((b, idx) => {
       const def = getBlockDef(b.type);
-      const cmd = generateBlockCommand(b);
+      const cmd = generateBlockCommand(b, idx);
       script += `# [Step ${idx + 1}] ${def.name}\n`;
       script += `Write-Output "--- [Step ${idx + 1}: ${def.name}] ---"\n`;
       script += `$lastResult = (${cmd})\n`;
@@ -4611,7 +4968,7 @@ function generateFormattedScript(format) {
 
     blocks.forEach((b, idx) => {
       const def = getBlockDef(b.type);
-      const cmd = generateBlockCommand(b);
+      const cmd = generateBlockCommand(b, idx);
       script += `# [Step ${idx + 1}] ${def.name}\n`;
       script += `echo "--- [Step ${idx + 1}: ${def.name}] ---"\n`;
       script += `LAST_RESULT=$(${cmd})\n`;
@@ -4625,7 +4982,7 @@ function generateFormattedScript(format) {
     script += `chcp 65001 > nul\n\n`;
     blocks.forEach((b, idx) => {
       const def = getBlockDef(b.type);
-      const cmd = generateBlockCommand(b);
+      const cmd = generateBlockCommand(b, idx);
       script += `rem [Step ${idx + 1}] ${def.name}\n`;
       script += `echo --- [Step ${idx + 1}: ${def.name}] ---\n`;
       script += `powershell -NoProfile -Command "chcp 65001 > $null; ${cmd.replaceAll('"', '\\"')}"\n\n`;
@@ -4637,160 +4994,311 @@ function generateFormattedScript(format) {
   return '';
 }
 
-async function executeScript(script) {
+// 🚀 高機能ワークフロー実行エンジン (データパイプライン / ブレークポイント / 並列DAG / プロファイラー連動)
+let isWorkflowRunning = false;
+
+async function executeWorkflowAdvanced(options = {}) {
+  if (blocks.length === 0) return;
+  const startIdx = options.startFromIndex || 0;
+  const isParallel = options.parallel || (document.getElementById('toggleParallelDag') && document.getElementById('toggleParallelDag').checked && currentViewMode === 'node');
+
+  isWorkflowRunning = true;
   statusBadge.className = 'status-indicator running';
-  statusBadge.textContent = '動かしています...';
+  statusBadge.textContent = isParallel ? '並列実行中...' : '動かしています...';
   durationBadge.classList.add('hidden');
   btnStopProcess.classList.remove('hidden');
   explanationBox.classList.add('hidden');
-  outputLog.textContent = ''; // リアルタイム受信のためクリア
 
-  blocks.forEach(b => {
-    b._status = 'running';
-    updateBlockStatus(b);
-  });
-
-  const isAdmin = toggleRunAsAdmin && toggleRunAsAdmin.checked;
-  const finalScript = isAdmin 
-    ? (isUnix() ? `sudo bash -c '${script}'` : `Write-Output "※ 管理者権限で起動しています..."; ${script}`)
-    : script;
-
-  if (isDemoMode) {
-    let lines = ['=== [お試し実行の結果 (デモ)] ===\n'];
-    blocks.forEach((b, idx) => {
-      const def = getBlockDef(b.type);
-      lines.push(`----------------------------------------\n`);
-      lines.push(`[ステップ ${idx + 1}: ${def.name}]\n`);
-      lines.push(`裏で動いたコマンド: ${generateBlockCommand(b)}\n`);
-      if (b.type === 'wifi-password') {
-        lines.push(`SSID名           : MyHome_Wi-Fi_5G\nセキュリティキー : 893479124012\n\n`);
-      } else if (b.type === 'flush-dns') {
-        lines.push(`DNS リゾルバー キャッシュは正常にフラッシュされました。\n\n`);
-      } else {
-        lines.push(`(正常に処理が終わりました)\n\n`);
-      }
+  if (startIdx === 0) {
+    outputLog.textContent = `=== ワークフロー実行開始 [Profile: ${currentProfile.toUpperCase()}] ===\n\n`;
+    lastBlockOutputs = [];
+    executionProfilingData = [];
+    blocks.forEach(b => {
+      b._status = 'idle';
+      updateBlockStatus(b);
     });
-
-    let currentLine = 0;
-    const interval = setInterval(() => {
-      if (currentLine < lines.length) {
-        outputLog.textContent += lines[currentLine];
-        outputLog.scrollTop = outputLog.scrollHeight;
-        currentLine++;
-      } else {
-        clearInterval(interval);
-        btnStopProcess.classList.add('hidden');
-        durationBadge.textContent = '0.35s';
-        durationBadge.classList.remove('hidden');
-        statusBadge.className = 'status-indicator success';
-        statusBadge.textContent = '完了 (デモ)';
-        blocks.forEach(b => {
-          b._status = 'success';
-          b._duration = '0.08s';
-          updateBlockStatus(b);
-        });
-        saveExecutionHistory(true, outputLog.textContent);
-      }
-    }, 70);
-    return;
   }
 
+  const workflowStartTime = Date.now();
+  const stopOnError = toggleStopOnError && toggleStopOnError.checked;
+
   try {
-    const res = await fetch('/api/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ script: finalScript })
-    });
+    if (isParallel) {
+      // 🚀 DAG並列実行エンジン
+      await runParallelDagWorkflow();
+    } else {
+      // ⛓️ 直列パイプライン実行 (データパイプライン & ブレークポイント対応)
+      for (let i = startIdx; i < blocks.length; i++) {
+        if (!isWorkflowRunning) break;
+        const b = blocks[i];
+        const def = getBlockDef(b.type);
 
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.error || `HTTP ${res.status}`);
-    }
+        // 🔴 ブレークポイント判定 (再開直後でない場合)
+        if (b._breakpoint && i > startIdx) {
+          isWorkflowRunning = false;
+          statusBadge.className = 'status-indicator warning';
+          statusBadge.textContent = `一時停止 (Step ${i + 1})`;
+          outputLog.textContent += `\n🔴 [ブレークポイント] ステップ ${i + 1} (${def.name}) の直前で一時停止しました。\n「次へ進む」または「再開」ボタンで続行できます。\n`;
+          outputLog.scrollTop = outputLog.scrollHeight;
 
-    // SSE / NDJSON ストリーミング受信
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
+          // ステップ実行バーを表示して再開可能に
+          isStepRunning = true;
+          currentStepIndex = i;
+          stepControlBar.classList.remove('hidden');
+          updateStepHighlight();
+          btnStopProcess.classList.add('hidden');
+          return;
+        }
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+        // コマンド生成 (前ノードの出力を {output} に動的注入)
+        const cmd = generateBlockCommand(b, i);
+        b._status = 'running';
+        updateBlockStatus(b);
 
-      buffer += decoder.decode(value, { stream: true });
-      const events = buffer.split('\n\n');
-      buffer = events.pop(); // 途中のデータを持ち越し
+        outputLog.textContent += `----------------------------------------\n[ステップ ${i + 1}: ${def.name}]\n$ ${cmd}\n`;
+        outputLog.scrollTop = outputLog.scrollHeight;
 
-      for (const evStr of events) {
-        if (!evStr.startsWith('data: ')) continue;
-        const jsonStr = evStr.replace(/^data: /, '').trim();
-        if (!jsonStr) continue;
+        const stepStartMs = Date.now();
+        let stepOutput = '';
+        let stepOk = true;
 
-        try {
-          const ev = JSON.parse(jsonStr);
-          if (ev.type === 'stdout' || ev.type === 'stderr') {
-            outputLog.textContent += ev.text;
-            outputLog.scrollTop = outputLog.scrollHeight;
-          } else if (ev.type === 'done') {
-            btnStopProcess.classList.add('hidden');
-            durationBadge.textContent = ev.duration;
-            durationBadge.classList.remove('hidden');
+        if (isDemoMode) {
+          await new Promise(r => setTimeout(r, 250));
+          outputLog.textContent += `(正常に処理が完了しました)\n\n`;
+          stepOutput = 'success';
+        } else {
+          const res = await fetch('/api/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ script: cmd })
+          });
 
-            if (ev.ok) {
-              statusBadge.className = 'status-indicator success';
-              statusBadge.textContent = 'おわりました';
-              const avgDur = ev.duration ? (parseFloat(ev.duration) / Math.max(1, blocks.length)).toFixed(2) : '0.05';
-              blocks.forEach(b => {
-                b._status = 'success';
-                b._duration = `${avgDur}s`;
-                updateBlockStatus(b);
-              });
-              renderErrorDiagnosis(null);
-              saveExecutionHistory(true, outputLog.textContent);
-            } else {
-              statusBadge.className = 'status-indicator error';
-              statusBadge.textContent = '途中でストップしました';
-              blocks.forEach(b => {
-                if (b._status === 'running') b._status = 'error';
-                updateBlockStatus(b);
-              });
-              const diag = ev.explanation || diagnoseErrorClient(outputLog.textContent, ev.exitCode);
-              renderErrorDiagnosis(diag);
-              saveExecutionHistory(false, outputLog.textContent);
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop();
+
+            for (const evStr of events) {
+              if (!evStr.startsWith('data: ')) continue;
+              try {
+                const ev = JSON.parse(evStr.replace(/^data: /, ''));
+                if (ev.type === 'stdout' || ev.type === 'stderr') {
+                  outputLog.textContent += ev.text;
+                  stepOutput += ev.text;
+                  outputLog.scrollTop = outputLog.scrollHeight;
+                } else if (ev.type === 'done') {
+                  stepOk = ev.ok;
+                  if (!ev.ok) {
+                    const diag = ev.explanation || diagnoseErrorClient(outputLog.textContent, ev.exitCode);
+                    renderErrorDiagnosis(diag);
+                  }
+                }
+              } catch(e) {}
             }
-          } else if (ev.type === 'error') {
-            outputLog.textContent += `\n[エラー]: ${ev.message}\n`;
-            statusBadge.className = 'status-indicator error';
-            statusBadge.textContent = 'エラー';
-            blocks.forEach(b => {
-              b._status = 'error';
-              updateBlockStatus(b);
-            });
-            const diag = diagnoseErrorClient(outputLog.textContent, 1);
-            renderErrorDiagnosis(diag);
-            saveExecutionHistory(false, outputLog.textContent);
           }
-        } catch (e) {
-          // ignore
+          outputLog.textContent += '\n';
+        }
+
+        const stepDurationMs = Date.now() - stepStartMs;
+        const durText = `${(stepDurationMs / 1000).toFixed(2)}s`;
+        b._status = stepOk ? 'success' : 'error';
+        b._duration = durText;
+        updateBlockStatus(b);
+
+        // データパイプラインキャッシュ & プロファイラーメトリクス記録
+        lastBlockOutputs[i] = stepOutput.trim();
+        executionProfilingData.push({
+          index: i + 1,
+          name: def.name,
+          durationMs: stepDurationMs,
+          status: b._status
+        });
+
+        if (!stepOk && stopOnError) {
+          outputLog.textContent += `\n[停止] エラーが発生したためワークフローを中断しました。\n`;
+          statusBadge.className = 'status-indicator error';
+          statusBadge.textContent = 'エラー中断';
+          btnStopProcess.classList.add('hidden');
+          isWorkflowRunning = false;
+          return;
         }
       }
     }
-  } catch (err) {
+
+    // ワークフロー全完了
+    const totalDuration = ((Date.now() - workflowStartTime) / 1000).toFixed(2);
+    durationBadge.textContent = `${totalDuration}s`;
+    durationBadge.classList.remove('hidden');
+    statusBadge.className = 'status-indicator success';
+    statusBadge.textContent = '全ステップ完了';
     btnStopProcess.classList.add('hidden');
+    isWorkflowRunning = false;
+    isStepRunning = false;
+    if (stepControlBar) stepControlBar.classList.add('hidden');
+
+    outputLog.textContent += `\n=== すべての処理が正常に終了しました (総所要時間: ${totalDuration}s) ===\n`;
+    outputLog.scrollTop = outputLog.scrollHeight;
+
+    // プロファイラーボタンを表示
+    const btnOpenProfiler = document.getElementById('btnOpenProfiler');
+    if (btnOpenProfiler) btnOpenProfiler.classList.remove('hidden');
+
+    // 世代スナップショット自動記録
+    takeWorkflowSnapshot('実行完了スナップショット');
+    saveExecutionHistory(true, outputLog.textContent);
+
+  } catch(err) {
     statusBadge.className = 'status-indicator error';
-    statusBadge.textContent = '通信エラー';
-    blocks.forEach(b => {
-      b._status = 'error';
-      updateBlockStatus(b);
-    });
-    outputLog.textContent = 'サーバーとの通信でエラーが出ました: ' + err.message;
-    renderErrorDiagnosis({
-      badge: '接続エラー (Network)',
-      summary: 'サーバーとの通信に失敗しました',
-      cause: 'バックエンドサーバー (server.js) が停止しているか、アクセスできません。',
-      action: 'ターミナルで `node server.js` または `start.bat` が正常に動いているか確認してください。'
-    });
-    saveExecutionHistory(false, outputLog.textContent);
+    statusBadge.textContent = 'エラー発生';
+    outputLog.textContent += `\n[致命的エラー]: ${err.message}\n`;
+    btnStopProcess.classList.add('hidden');
+    isWorkflowRunning = false;
   }
+}
+
+// 🚀 DAG並列実行エンジン (独立ノードをPromise.allで同時実行)
+async function runParallelDagWorkflow() {
+  const blockMap = new Map();
+  const inDegree = new Map();
+  const outgoing = new Map();
+
+  blocks.forEach(b => {
+    blockMap.set(b.id, b);
+    inDegree.set(b.id, 0);
+    outgoing.set(b.id, []);
+  });
+
+  if (connections && connections.length > 0) {
+    connections.forEach(c => {
+      if (blockMap.has(c.from) && blockMap.has(c.to)) {
+        outgoing.get(c.from).push(c.to);
+        inDegree.set(c.to, inDegree.get(c.to) + 1);
+      }
+    });
+  } else {
+    // 直列フォールバック
+    for (let i = 0; i < blocks.length - 1; i++) {
+      outgoing.get(blocks[i].id).push(blocks[i + 1].id);
+      inDegree.set(blocks[i + 1].id, 1);
+    }
+  }
+
+  let readyNodes = blocks.filter(b => inDegree.get(b.id) === 0);
+  const completedNodes = new Set();
+  const nodeOutputs = new Map();
+
+  while (readyNodes.length > 0) {
+    if (!isWorkflowRunning) break;
+
+    outputLog.textContent += `\n=== 並列実行バッチ (${readyNodes.length}ノード同時実行) ===\n`;
+    outputLog.scrollTop = outputLog.scrollHeight;
+
+    // 独立したノード群を Promise.all で完全並列実行
+    await Promise.all(readyNodes.map(async (b) => {
+      const def = getBlockDef(b.type);
+      const bIdx = blocks.indexOf(b);
+      const incomingOut = nodeOutputs.get(b.id) || '';
+      const cmd = generateBlockCommand(b, bIdx, incomingOut);
+
+      b._status = 'running';
+      updateBlockStatus(b);
+
+      const stepStartMs = Date.now();
+      let stepOutput = '';
+      let stepOk = true;
+
+      try {
+        if (isDemoMode) {
+          await new Promise(r => setTimeout(r, 300));
+          stepOutput = 'success';
+        } else {
+          const runId = `dag_${b.id}_${Date.now()}`;
+          const res = await fetch('/api/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ script: cmd, runId })
+          });
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop();
+            for (const evStr of events) {
+              if (!evStr.startsWith('data: ')) continue;
+              try {
+                const ev = JSON.parse(evStr.replace(/^data: /, ''));
+                if (ev.type === 'stdout' || ev.type === 'stderr') {
+                  outputLog.textContent += `[${def.name}] ${ev.text}`;
+                  stepOutput += ev.text;
+                  outputLog.scrollTop = outputLog.scrollHeight;
+                } else if (ev.type === 'done') {
+                  stepOk = ev.ok;
+                }
+              } catch(e) {}
+            }
+          }
+        }
+      } catch(e) {
+        stepOk = false;
+      }
+
+      const durMs = Date.now() - stepStartMs;
+      b._status = stepOk ? 'success' : 'error';
+      b._duration = `${(durMs / 1000).toFixed(2)}s`;
+      updateBlockStatus(b);
+
+      lastBlockOutputs[bIdx] = stepOutput.trim();
+      executionProfilingData.push({
+        index: bIdx + 1,
+        name: def.name,
+        durationMs: durMs,
+        status: b._status
+      });
+
+      // 子ノードへ出力を引き継ぐ
+      outgoing.get(b.id).forEach(childId => {
+        nodeOutputs.set(childId, (nodeOutputs.get(childId) ? nodeOutputs.get(childId) + '\n' : '') + stepOutput.trim());
+      });
+
+      completedNodes.add(b.id);
+    }));
+
+    // 次に実行可能なノード（親がすべて完了したノード）を収集
+    const nextReady = [];
+    blocks.forEach(b => {
+      if (!completedNodes.has(b.id)) {
+        const parents = [];
+        if (connections && connections.length > 0) {
+          connections.forEach(c => { if (c.to === b.id) parents.push(c.from); });
+        } else {
+          const idx = blocks.indexOf(b);
+          if (idx > 0) parents.push(blocks[idx - 1].id);
+        }
+        if (parents.every(pId => completedNodes.has(pId))) {
+          nextReady.push(b);
+        }
+      }
+    });
+
+    readyNodes = nextReady;
+  }
+}
+
+// 従来のexecuteScript (互換用)
+async function executeScript(script) {
+  return executeWorkflowAdvanced();
 }
 
 // 🔍 ノードズーム管理
@@ -4933,6 +5441,407 @@ function renderSecretsList() {
 
     secretsList.appendChild(row);
   });
+}
+
+// ==========================================================================
+// ⚡ 7大上級者プロ機能 ロジック実装
+// ==========================================================================
+
+// 1. 🌐 環境プロファイル (Profiles) 関連
+function initProfileControls() {
+  const profileSelect = document.getElementById('profileSelect');
+  const btnManageProfiles = document.getElementById('btnManageProfiles');
+  const profileModal = document.getElementById('profileModal');
+  const btnProfileClose = document.getElementById('btnProfileClose');
+  const btnAddProfileVar = document.getElementById('btnAddProfileVar');
+
+  loadProfiles();
+  renderProfileSelectOptions();
+
+  if (profileSelect) {
+    profileSelect.value = currentProfile;
+    profileSelect.addEventListener('change', (e) => {
+      currentProfile = e.target.value;
+      saveProfiles();
+      renderCanvas(); // プレビュー即時更新
+    });
+  }
+
+  if (btnManageProfiles && profileModal) {
+    btnManageProfiles.addEventListener('click', () => {
+      renderProfileModal();
+      profileModal.classList.remove('hidden');
+    });
+  }
+
+  if (btnProfileClose && profileModal) {
+    btnProfileClose.addEventListener('click', () => profileModal.classList.add('hidden'));
+  }
+
+  if (btnAddProfileVar) {
+    btnAddProfileVar.addEventListener('click', () => {
+      const keyInput = document.getElementById('profileVarKey');
+      const valInput = document.getElementById('profileVarVal');
+      const key = keyInput.value.trim().toUpperCase();
+      const val = valInput.value.trim();
+      if (!key) return;
+
+      if (!userProfiles[currentProfile]) userProfiles[currentProfile] = {};
+      userProfiles[currentProfile][key] = val;
+      saveProfiles();
+      keyInput.value = '';
+      valInput.value = '';
+      renderProfileModal();
+      renderCanvas();
+    });
+  }
+}
+
+function renderProfileSelectOptions() {
+  const profileSelect = document.getElementById('profileSelect');
+  if (!profileSelect) return;
+  profileSelect.innerHTML = '';
+  const profileIcons = { local: '🌐', staging: '🟡', production: '🔴' };
+  Object.keys(userProfiles).forEach(pKey => {
+    const opt = document.createElement('option');
+    opt.value = pKey;
+    opt.textContent = `${profileIcons[pKey] || '📁'} ${pKey.charAt(0).toUpperCase() + pKey.slice(1)}`;
+    if (pKey === currentProfile) opt.selected = true;
+    profileSelect.appendChild(opt);
+  });
+}
+
+function renderProfileModal() {
+  const tabsBar = document.getElementById('profileTabsBar');
+  const varsList = document.getElementById('profileVarsList');
+  if (!tabsBar || !varsList) return;
+
+  // タブ描画
+  tabsBar.innerHTML = '';
+  Object.keys(userProfiles).forEach(pKey => {
+    const tab = document.createElement('button');
+    tab.className = `profile-tab-pill ${pKey === currentProfile ? 'active' : ''}`;
+    tab.textContent = pKey.toUpperCase();
+    tab.addEventListener('click', () => {
+      currentProfile = pKey;
+      saveProfiles();
+      renderProfileSelectOptions();
+      renderProfileModal();
+      renderCanvas();
+    });
+    tabsBar.appendChild(tab);
+  });
+
+  // 新規プロファイル作成ボタン
+  const addTabBtn = document.createElement('button');
+  addTabBtn.className = 'profile-tab-pill';
+  addTabBtn.textContent = '+ 新規';
+  addTabBtn.addEventListener('click', () => {
+    const name = prompt('新しいプロファイル名を入力してください (例: testing, qa, aws):');
+    if (name && name.trim()) {
+      const clean = name.trim().toLowerCase();
+      if (!userProfiles[clean]) {
+        userProfiles[clean] = {};
+        currentProfile = clean;
+        saveProfiles();
+        renderProfileSelectOptions();
+        renderProfileModal();
+      }
+    }
+  });
+  tabsBar.appendChild(addTabBtn);
+
+  // 変数一覧描画
+  varsList.innerHTML = '';
+  const activeVars = userProfiles[currentProfile] || {};
+  const entries = Object.entries(activeVars);
+  if (entries.length === 0) {
+    varsList.innerHTML = '<div class="text-subtle" style="padding:14px;text-align:center;">まだ変数がありません。上のフォームから追加してください。</div>';
+    return;
+  }
+
+  entries.forEach(([k, v]) => {
+    const row = document.createElement('div');
+    row.className = 'profile-var-row';
+    row.innerHTML = `
+      <div>
+        <strong style="color:var(--primary);">{${k}}</strong>
+        <span style="color:var(--text-muted);margin:0 6px;">=</span>
+        <span>${v}</span>
+      </div>
+      <button class="icon-btn btn-del-var" title="削除">✕</button>
+    `;
+    row.querySelector('.btn-del-var').addEventListener('click', () => {
+      delete userProfiles[currentProfile][k];
+      saveProfiles();
+      renderProfileModal();
+      renderCanvas();
+    });
+    varsList.appendChild(row);
+  });
+}
+
+// 2. 📊 実行プロファイラー (Profiler) 関連
+function initProfilerControls() {
+  const btnOpenProfiler = document.getElementById('btnOpenProfiler');
+  const profilerModal = document.getElementById('profilerModal');
+  const btnProfilerClose = document.getElementById('btnProfilerClose');
+
+  if (btnOpenProfiler && profilerModal) {
+    btnOpenProfiler.addEventListener('click', () => {
+      renderProfilerTimeline();
+      profilerModal.classList.remove('hidden');
+    });
+  }
+
+  if (btnProfilerClose && profilerModal) {
+    btnProfilerClose.addEventListener('click', () => profilerModal.classList.add('hidden'));
+  }
+}
+
+function renderProfilerTimeline() {
+  const container = document.getElementById('profilerTimeline');
+  const totalDurationEl = document.getElementById('profTotalDuration');
+  const stepCountEl = document.getElementById('profStepCount');
+  const bottleneckNameEl = document.getElementById('profBottleneckName');
+
+  if (!container || executionProfilingData.length === 0) {
+    if (container) container.innerHTML = '<div class="text-subtle" style="padding:20px;text-align:center;">プロファイルデータがありません。ワークフローを実行してください。</div>';
+    return;
+  }
+
+  const totalMs = executionProfilingData.reduce((acc, cur) => acc + cur.durationMs, 0);
+  const maxDurMs = Math.max(...executionProfilingData.map(d => d.durationMs), 1);
+  const bottleneckItem = executionProfilingData.reduce((prev, cur) => (cur.durationMs > prev.durationMs ? cur : prev), executionProfilingData[0]);
+
+  totalDurationEl.textContent = `${(totalMs / 1000).toFixed(2)}s`;
+  stepCountEl.textContent = executionProfilingData.length;
+  bottleneckNameEl.textContent = `${bottleneckItem.name} (${(bottleneckItem.durationMs / 1000).toFixed(2)}s)`;
+
+  container.innerHTML = '';
+  executionProfilingData.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'prof-timeline-row';
+    const percentOfMax = Math.max(5, (item.durationMs / maxDurMs) * 100);
+    const isBottleneck = item === bottleneckItem && executionProfilingData.length > 1;
+
+    row.innerHTML = `
+      <div class="prof-step-label" title="${item.name}">Step ${item.index}: ${item.name}</div>
+      <div class="prof-bar-track">
+        <div class="prof-bar-fill ${isBottleneck ? 'bottleneck' : ''}" style="width: ${percentOfMax}%;"></div>
+      </div>
+      <div class="prof-time-text">${(item.durationMs / 1000).toFixed(2)}s</div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+// 3. ⏱ 世代スナップショット & 差分Diff (Snapshots)
+function getSnapshotStorageKey() {
+  return `workflow_snapshots_${activeTabId || 'default'}`;
+}
+
+function loadSnapshots() {
+  try {
+    const raw = localStorage.getItem(getSnapshotStorageKey());
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function takeWorkflowSnapshot(comment = '自動保存') {
+  if (blocks.length === 0) return;
+  try {
+    const list = loadSnapshots();
+    const snap = {
+      id: 'snap_' + Date.now(),
+      timestamp: new Date().toISOString(),
+      comment,
+      blockCount: blocks.length,
+      blocks: JSON.parse(JSON.stringify(blocks))
+    };
+    list.unshift(snap);
+    if (list.length > 30) list.pop(); // 最大30世代
+    localStorage.setItem(getSnapshotStorageKey(), JSON.stringify(list));
+  } catch(e) {}
+}
+
+function initSnapshotControls() {
+  const btnWorkflowSnapshots = document.getElementById('btnWorkflowSnapshots');
+  const snapshotModal = document.getElementById('snapshotModal');
+  const btnSnapshotClose = document.getElementById('btnSnapshotClose');
+  const btnRestoreSnapshot = document.getElementById('btnRestoreSnapshot');
+
+  let selectedSnapshot = null;
+
+  if (btnWorkflowSnapshots && snapshotModal) {
+    btnWorkflowSnapshots.addEventListener('click', () => {
+      renderSnapshotList();
+      snapshotModal.classList.remove('hidden');
+    });
+  }
+
+  if (btnSnapshotClose && snapshotModal) {
+    btnSnapshotClose.addEventListener('click', () => snapshotModal.classList.add('hidden'));
+  }
+
+  if (btnRestoreSnapshot) {
+    btnRestoreSnapshot.addEventListener('click', () => {
+      if (!selectedSnapshot) return;
+      if (confirm(`このバージョン (${new Date(selectedSnapshot.timestamp).toLocaleTimeString()}) に復元しますか？\n現在のブロックは置き換わります。`)) {
+        takeWorkflowSnapshot('復元前のバックアップ');
+        blocks = JSON.parse(JSON.stringify(selectedSnapshot.blocks));
+        syncToActiveTab();
+        renderCanvas();
+        snapshotModal.classList.add('hidden');
+      }
+    });
+  }
+
+  function renderSnapshotList() {
+    const listEl = document.getElementById('snapshotList');
+    const diffEl = document.getElementById('snapshotDiffContent');
+    const restoreBtn = document.getElementById('btnRestoreSnapshot');
+    if (!listEl) return;
+
+    const list = loadSnapshots();
+    listEl.innerHTML = '';
+    diffEl.innerHTML = '<div class="text-subtle" style="padding: 20px; text-align: center;">左のリストから履歴を選択してください</div>';
+    restoreBtn.style.display = 'none';
+
+    if (list.length === 0) {
+      listEl.innerHTML = '<div class="text-subtle" style="padding:10px;">履歴がまだありません</div>';
+      return;
+    }
+
+    list.forEach((snap) => {
+      const item = document.createElement('div');
+      item.className = 'snapshot-item';
+      const d = new Date(snap.timestamp);
+      const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+      item.innerHTML = `
+        <div class="snapshot-time">${timeStr}</div>
+        <div class="snapshot-meta">${snap.comment} (${snap.blockCount}個のブロック)</div>
+      `;
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.snapshot-item').forEach(el => el.classList.remove('active'));
+        item.classList.add('active');
+        selectedSnapshot = snap;
+        restoreBtn.style.display = 'block';
+        renderDiff(snap);
+      });
+      listEl.appendChild(item);
+    });
+  }
+
+  function renderDiff(snap) {
+    const diffEl = document.getElementById('snapshotDiffContent');
+    const oldBlocks = snap.blocks || [];
+    const curBlocks = blocks || [];
+
+    let diffHtml = '';
+    const maxLen = Math.max(oldBlocks.length, curBlocks.length);
+
+    for (let i = 0; i < maxLen; i++) {
+      const oldB = oldBlocks[i];
+      const curB = curBlocks[i];
+
+      if (!oldB && curB) {
+        const def = getBlockDef(curB.type);
+        diffHtml += `<div class="diff-tag-added">+ [Step ${i + 1}] ${def ? def.name : curB.type} (この世代より後に追加)</div>`;
+      } else if (oldB && !curB) {
+        const def = getBlockDef(oldB.type);
+        diffHtml += `<div class="diff-tag-removed">- [Step ${i + 1}] ${def ? def.name : oldB.type} (現在は削除されています)</div>`;
+      } else if (oldB && curB) {
+        if (oldB.type !== curB.type) {
+          const oldDef = getBlockDef(oldB.type);
+          const curDef = getBlockDef(curB.type);
+          diffHtml += `<div class="diff-tag-changed">~ [Step ${i + 1}] 種類変更: ${oldDef ? oldDef.name : oldB.type} ➔ ${curDef ? curDef.name : curB.type}</div>`;
+        } else {
+          const changedParams = [];
+          const allKeys = new Set([...Object.keys(oldB.params || {}), ...Object.keys(curB.params || {})]);
+          allKeys.forEach(k => {
+            if (oldB.params[k] !== curB.params[k]) {
+              changedParams.push(`${k}: "${oldB.params[k] || ''}" ➔ "${curB.params[k] || ''}"`);
+            }
+          });
+          const def = getBlockDef(curB.type);
+          if (changedParams.length > 0) {
+            diffHtml += `<div class="diff-tag-changed">~ [Step ${i + 1}] ${def ? def.name : curB.type}: パラメータ変更 (${changedParams.join(', ')})</div>`;
+          } else {
+            diffHtml += `<div style="color:var(--text-muted);padding:2px 6px;">= [Step ${i + 1}] ${def ? def.name : curB.type} (変更なし)</div>`;
+          }
+        }
+      }
+    }
+
+    diffEl.innerHTML = diffHtml || '<div style="color:#4ade80;padding:10px;">差分なし（現在のワークフローと完全に一致しています）</div>';
+  }
+}
+
+// 4. 🔗 外部連携 (Webhook / REST API) スニペット
+function initWebhookControls() {
+  const btnWebhookModal = document.getElementById('btnWebhookModal');
+  const webhookModal = document.getElementById('webhookModal');
+  const btnWebhookClose = document.getElementById('btnWebhookClose');
+
+  if (btnWebhookModal && webhookModal) {
+    btnWebhookModal.addEventListener('click', () => {
+      renderWebhookSnippets();
+      webhookModal.classList.remove('hidden');
+    });
+  }
+
+  if (btnWebhookClose && webhookModal) {
+    btnWebhookClose.addEventListener('click', () => webhookModal.classList.add('hidden'));
+  }
+
+  document.querySelectorAll('.btn-copy-snippet').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-target');
+      const targetEl = document.getElementById(targetId);
+      if (targetEl) {
+        navigator.clipboard.writeText(targetEl.textContent);
+        const originalText = btn.textContent;
+        btn.textContent = '✓ コピー完了';
+        setTimeout(() => btn.textContent = originalText, 1500);
+      }
+    });
+  });
+}
+
+function renderWebhookSnippets() {
+  const script = buildFullScript();
+  const escapedScriptJson = JSON.stringify(script);
+
+  const curlCode = `curl -X POST http://localhost:3456/api/workflow/run \\
+  -H "Content-Type: application/json" \\
+  -d '{"script": ${escapedScriptJson}}'`;
+
+  const pwshCode = `$body = @{ script = @'\n${script}\n'@ } | ConvertTo-Json
+$res = Invoke-RestMethod -Uri "http://localhost:3456/api/workflow/run" -Method Post -Body $body -ContentType "application/json"
+Write-Output "実行結果: $($res.ok), 所要時間: $($res.duration)"
+Write-Output $res.stdout`;
+
+  const pythonCode = `import requests
+
+payload = {
+    "script": """${script.replaceAll('"""', '\\"\\"\\"')}"""
+}
+res = requests.post("http://localhost:3456/api/workflow/run", json=payload)
+data = res.json()
+print("Success:", data.get("ok"))
+print("Duration:", data.get("duration"))
+print(data.get("stdout"))`;
+
+  const curlEl = document.getElementById('snippetCurl');
+  const pwshEl = document.getElementById('snippetPwsh');
+  const pythonEl = document.getElementById('snippetPython');
+
+  if (curlEl) curlEl.textContent = curlCode;
+  if (pwshEl) pwshEl.textContent = pwshCode;
+  if (pythonEl) pythonEl.textContent = pythonCode;
 }
 
 init();
