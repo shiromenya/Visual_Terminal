@@ -163,9 +163,21 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">システム・診断・修復</span>
               </div>
-              <span class="acc-count">21</span>
+              <span class="acc-count">24</span>
             </summary>
             <div class="acc-content">
+              <button class="item-btn" data-type="tzutil-timezone">
+                <span class="item-label">タイムゾーン確認・変更</span>
+                <span class="item-cmd">tzutil</span>
+              </button>
+              <button class="item-btn" data-type="quser-sessions">
+                <span class="item-label">ログオン中セッション一覧</span>
+                <span class="item-cmd">quser / who</span>
+              </button>
+              <button class="item-btn" data-type="ftype-assoc">
+                <span class="item-label">ファイルタイプ起動定義調査</span>
+                <span class="item-cmd">ftype</span>
+              </button>
               <button class="item-btn" data-type="sys-repair">
                 <span class="item-label">壊れたシステムファイルを修復</span>
                 <span class="item-cmd">sfc</span>
@@ -246,6 +258,10 @@
                 <span class="item-label">DirectX・グラフィック診断</span>
                 <span class="item-cmd">dxdiag</span>
               </button>
+              <button class="item-btn" data-type="screen-capture">
+                <span class="item-label">画面スクリーンショット自動撮影</span>
+                <span class="item-cmd">screenshot</span>
+              </button>
               <button class="item-btn item-danger" data-type="boot-repair">
                 <span class="item-label">[危険] ブートセクター修復 (起動トラブル用)</span>
                 <span class="item-cmd">bootrec</span>
@@ -260,9 +276,13 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">ネットワーク・通信</span>
               </div>
-              <span class="acc-count">15</span>
+              <span class="acc-count">17</span>
             </summary>
             <div class="acc-content">
+              <button class="item-btn" data-type="openfiles-query">
+                <span class="item-label">共有で開かれているファイル調査</span>
+                <span class="item-cmd">openfiles</span>
+              </button>
               <button class="item-btn" data-type="show-ip">
                 <span class="item-label">自分のIPアドレスを調べる</span>
                 <span class="item-cmd">ipconfig</span>
@@ -323,6 +343,10 @@
                 <span class="item-label">WebからファイルDL</span>
                 <span class="item-cmd">curl</span>
               </button>
+              <button class="item-btn" data-type="ssh-exec">
+                <span class="item-label">リモートサーバーに遠隔実行</span>
+                <span class="item-cmd">ssh</span>
+              </button>
             </div>
           </details>
 
@@ -333,9 +357,21 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">ストレージ・ディスク</span>
               </div>
-              <span class="acc-count">10</span>
+              <span class="acc-count">13</span>
             </summary>
             <div class="acc-content">
+              <button class="item-btn" data-type="fsutil-manage">
+                <span class="item-label">巨大ダミーファイル作成</span>
+                <span class="item-cmd">fsutil file</span>
+              </button>
+              <button class="item-btn" data-type="vssadmin-shadows">
+                <span class="item-label">復元ポイント・シャドウコピー確認</span>
+                <span class="item-cmd">vssadmin</span>
+              </button>
+              <button class="item-btn" data-type="label-drive">
+                <span class="item-label">ドライブのボリューム名変更</span>
+                <span class="item-cmd">label</span>
+              </button>
               <button class="item-btn" data-type="disk-free-space">
                 <span class="item-label">各ドライブの空き容量</span>
                 <span class="item-cmd">fsutil</span>
@@ -356,8 +392,8 @@
                 <span class="item-label">奥の深いフォルダを「Zドライブ」化</span>
                 <span class="item-cmd">subst</span>
               </button>
-              <button class="item-btn" data-type="compact-disk">
-                <span class="item-label">NTFSファイル圧縮で容量削減</span>
+              <button class="item-btn" data-type="compact-compress">
+                <span class="item-label">NTFSファイル圧縮・解除</span>
                 <span class="item-cmd">compact</span>
               </button>
               <button class="item-btn" data-type="defrag-drive">
@@ -390,9 +426,29 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">ファイル・検索・同期</span>
               </div>
-              <span class="acc-count">13</span>
+              <span class="acc-count">18</span>
             </summary>
             <div class="acc-content">
+              <button class="item-btn" data-type="pushd-dir">
+                <span class="item-label">一時的なフォルダ/共有移動</span>
+                <span class="item-cmd">pushd</span>
+              </button>
+              <button class="item-btn" data-type="replace-in-files">
+                <span class="item-label">ファイル内の文字列を一括置換</span>
+                <span class="item-cmd">-replace / sed</span>
+              </button>
+              <button class="item-btn" data-type="touch-file">
+                <span class="item-label">空ファイル作成・更新日時更新</span>
+                <span class="item-cmd">touch</span>
+              </button>
+              <button class="item-btn" data-type="tail-file">
+                <span class="item-label">ログファイルの末尾を追跡監視</span>
+                <span class="item-cmd">tail -f</span>
+              </button>
+              <button class="item-btn" data-type="calc-hash">
+                <span class="item-label">ハッシュ値検証 (SHA256/MD5)</span>
+                <span class="item-cmd">Get-FileHash</span>
+              </button>
               <button class="item-btn" data-type="robocopy-sync">
                 <span class="item-label">フォルダ丸ごと高速同期</span>
                 <span class="item-cmd">robocopy</span>
@@ -455,9 +511,13 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">プロセス・サービス・電源</span>
               </div>
-              <span class="acc-count">7</span>
+              <span class="acc-count">9</span>
             </summary>
             <div class="acc-content">
+              <button class="item-btn item-danger" data-type="kill-process">
+                <span class="item-label">プロセス強制終了 (PID/名前)</span>
+                <span class="item-cmd">Stop-Process</span>
+              </button>
               <button class="item-btn" data-type="process-list">
                 <span class="item-label">実行中プロセス一覧</span>
                 <span class="item-cmd">tasklist</span>
@@ -500,9 +560,17 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">セキュリティ・権限</span>
               </div>
-              <span class="acc-count">9</span>
+              <span class="acc-count">11</span>
             </summary>
             <div class="acc-content">
+              <button class="item-btn" data-type="defender-scan">
+                <span class="item-label">Windows Defender即時検査</span>
+                <span class="item-cmd">Start-MpScan</span>
+              </button>
+              <button class="item-btn item-danger" data-type="firewall-rule">
+                <span class="item-label">ファイアウォールポート開放/遮断</span>
+                <span class="item-cmd">New-NetFirewallRule</span>
+              </button>
               <button class="item-btn" data-type="whoami-info">
                 <span class="item-label">ユーザー名と権限SID確認</span>
                 <span class="item-cmd">whoami</span>
@@ -574,9 +642,25 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">圧縮・ツール・Git</span>
               </div>
-              <span class="acc-count">5</span>
+              <span class="acc-count">9</span>
             </summary>
             <div class="acc-content">
+              <button class="item-btn" data-type="git-clone">
+                <span class="item-label">Gitリポジトリをダウンロード</span>
+                <span class="item-cmd">git clone</span>
+              </button>
+              <button class="item-btn" data-type="git-commit-push">
+                <span class="item-label">全変更をコミット＆プッシュ</span>
+                <span class="item-cmd">git commit & push</span>
+              </button>
+              <button class="item-btn" data-type="docker-manage">
+                <span class="item-label">Dockerコンテナ操作・確認</span>
+                <span class="item-cmd">docker</span>
+              </button>
+              <button class="item-btn" data-type="wsl-exec">
+                <span class="item-label">WSL/Linuxで直接実行</span>
+                <span class="item-cmd">wsl.exe</span>
+              </button>
               <button class="item-btn" data-type="zip-compress">
                 <span class="item-label">Zipアーカイブ圧縮</span>
                 <span class="item-cmd">zip / tar</span>
@@ -607,9 +691,13 @@
                 <span class="acc-chevron">▶</span>
                 <span class="acc-title">ロジック・自動化・Shell</span>
               </div>
-              <span class="acc-count">11</span>
+              <span class="acc-count">12</span>
             </summary>
             <div class="acc-content">
+              <button class="item-btn" data-type="choice-prompt">
+                <span class="item-label">[Y/N] キー選択入力を待機</span>
+                <span class="item-cmd">choice / read</span>
+              </button>
               <button class="item-btn highlight" data-type="custom-command">
                 <span class="item-label">自由なシェルコマンド</span>
                 <span class="item-cmd">custom shell</span>
@@ -709,6 +797,14 @@
 
       <!-- 中央: キャンバス & 実行出力 -->
       <main class="editor-pane">
+        <!-- 複数ワークフローのタブバー (マルチタブ) -->
+        <div class="workflow-tabs-bar" id="workflowTabsBar">
+          <div class="tabs-list" id="tabsList">
+            <!-- JSでタブを動的生成 -->
+          </div>
+          <button id="btnNewTab" class="btn-new-tab" title="新しいワークフローを作成">+</button>
+        </div>
+
         <!-- キャンバス操作エリア -->
         <div class="editor-header">
           <div class="editor-meta">
@@ -737,6 +833,10 @@
               </button>
             </div>
             <div class="divider"></div>
+            <button id="btnScheduleModal" class="btn btn-default" title="このワークフローを定時自動実行するようWindowsに登録">
+              <svg class="ui-icon sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>定時実行</span>
+            </button>
             <button id="btnExportScript" class="btn btn-default" title="PowerShell (.ps1) や Bash (.sh) として書き出す">
               <svg class="ui-icon sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span>スクリプト書出</span>
@@ -1031,13 +1131,41 @@
       </div>
     </div>
   </div>
-      <div class="secrets-add-row">
-        <input type="text" id="secretKeyInput" class="form-input" placeholder="変数名 (例: webhook_url, token)">
-        <input type="text" id="secretValInput" class="form-input" placeholder="値 (例: https://hooks.slack.com/...)">
-        <button id="btnAddSecret" class="btn btn-primary">+ 追加</button>
+
+  <!-- 定時実行スケジュール登録モーダル (Windowsタスクスケジューラ連携) -->
+  <div id="scheduleModal" class="modal-backdrop hidden">
+    <div class="dialog schedule-dialog">
+      <div class="dialog-header-row">
+        <div>
+          <div class="dialog-title">定時自動実行スケジュール登録</div>
+          <div class="dialog-desc">このワークフローを、指定した日時にWindowsが自動で実行するようタスクスケジューラに登録します。</div>
+        </div>
+        <button id="btnScheduleClose" class="btn btn-default">閉じる</button>
       </div>
-      <div id="secretsList" class="secrets-list">
-        <!-- 変数一覧を動的生成 -->
+      <div class="dialog-body">
+        <div class="form-row">
+          <label class="form-label">タスクの名前:</label>
+          <input type="text" id="scheduleTaskName" class="text-input" placeholder="例: DailyBackup" value="GraphicalTerminal_Workflow">
+        </div>
+        <div class="form-row">
+          <label class="form-label">実行する頻度 (スケジュール):</label>
+          <select id="scheduleFrequency" class="select-input">
+            <option value="DAILY">毎日 (Daily)</option>
+            <option value="WEEKLY">毎週月曜日 (Weekly)</option>
+            <option value="HOURLY">1時間ごと (Hourly)</option>
+            <option value="ONLOGON">PCログオン時 (On Logon)</option>
+          </select>
+        </div>
+        <div class="form-row" id="scheduleTimeRow">
+          <label class="form-label">実行する時刻 (HH:mm):</label>
+          <input type="time" id="scheduleTime" class="text-input" value="09:00">
+        </div>
+        <div class="field-label" style="margin-top: 10px; font-weight: 600; color: #475569;">登録されるコマンドの確認：</div>
+        <pre id="scheduleCmdPreview" class="code-preview" style="font-size: 11px; max-height: 80px;"></pre>
+      </div>
+      <div class="dialog-footer">
+        <button id="btnScheduleCancel" class="btn btn-default">やめる</button>
+        <button id="btnRegisterSchedule" class="btn btn-primary">Windowsにタスク登録する</button>
       </div>
     </div>
   </div>

@@ -486,6 +486,221 @@ body {
   background-color: var(--bg-main);
 }
 
+/* 複数ワークフローのタブバー (マルチタブ) */
+.workflow-tabs-bar {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 12px;
+  height: 36px;
+  overflow-x: auto;
+  gap: 4px;
+}
+
+.tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  height: 28px;
+  max-width: 180px;
+}
+
+.tab-item:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.tab-item.active {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  border-color: var(--border-color);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.tab-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+}
+
+.tab-close {
+  font-size: 11px;
+  opacity: 0.5;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.tab-close:hover {
+  opacity: 1;
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.btn-new-tab {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.btn-new-tab:hover {
+  background-color: var(--bg-hover);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* 個別ブロック実行成否＆所要時間バッジ */
+.block-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-family: "IBM Plex Mono", monospace;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-left: 6px;
+  transition: all 0.2s;
+}
+
+.block-status-badge.idle {
+  display: none;
+}
+
+.block-status-badge.running {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  animation: pulseBadge 1.2s infinite ease-in-out;
+}
+
+.block-status-badge.success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.block-status-badge.error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+[data-theme="dark"] .block-status-badge.running {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+[data-theme="dark"] .block-status-badge.success {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+[data-theme="dark"] .block-status-badge.error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+@keyframes pulseBadge {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+/* ノード入出力端子 (Ports / Pins for DAG wiring) */
+.node-port {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 2px solid var(--primary);
+  cursor: crosshair;
+  z-index: 20;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.node-port:hover, .node-port.port-active {
+  transform: scale(1.35);
+  background: var(--primary);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+}
+
+.node-port.port-in {
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.node-port.port-in:hover {
+  transform: translateX(-50%) scale(1.35);
+}
+
+.node-port.port-out {
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.node-port.port-out:hover {
+  transform: translateX(-50%) scale(1.35);
+}
+
+/* 結線ワイヤーのクリック可能領域 */
+.wire-click-target {
+  stroke: transparent;
+  stroke-width: 14px;
+  cursor: pointer;
+}
+
+.wire-click-target:hover + .wire-path {
+  stroke: #ef4444;
+  stroke-width: 3.5px;
+}
+
+/* ファイルドラッグ＆ドロップ時のハイライト */
+.drag-over-input {
+  outline: 2px dashed var(--primary) !important;
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+.drag-over-card {
+  outline: 2px dashed var(--primary) !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25) !important;
+}
+
 /* エディタヘッダー */
 .editor-header {
   height: 44px;
@@ -1525,24 +1740,29 @@ body {
   position: relative;
   flex: 1;
   overflow: auto;
-  padding: 40px;
+  padding: 0; /* パディングを0にしてSVGとカードレイヤーの原点を完全一致 */
+  background-color: #0b1120;
 }
 
 .node-wire-layer {
   position: absolute;
   top: 0;
   left: 0;
-  width: 3500px;
-  height: 2500px;
+  width: 4000px;
+  height: 3000px;
   pointer-events: none;
   z-index: 1;
+  overflow: visible;
 }
 
 .node-cards-layer {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4000px;
+  height: 3000px;
   z-index: 2;
-  min-width: 1400px;
-  min-height: 900px;
+  pointer-events: none; /* 下のSVGクリックや背景イベントを阻害しない */
 }
 
 /* ノードカード (パラメータ編集 & 自由ドラッグ対応) */
@@ -1557,6 +1777,7 @@ body {
   transition: box-shadow 0.15s, border-color 0.15s;
   cursor: default;
   user-select: none;
+  pointer-events: auto; /* カード自身はクリックや操作を受け取る */
 }
 
 .flow-node-card:hover {
@@ -1757,24 +1978,36 @@ body {
   white-space: nowrap;
 }
 
-/* ポート端子 (IN / OUT) */
+/* ポート端子 (IN / OUT) - ノードカードの端に完璧に吸着 */
 .flow-port {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background-color: #38bdf8;
-  border: 2px solid #0b1120;
-  box-shadow: 0 0 6px #38bdf8;
-  z-index: 5;
+  border: 2px solid #0f172a;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.8);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  cursor: crosshair;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  pointer-events: auto;
+}
+
+.flow-port:hover,
+.flow-port.port-active {
+  transform: translateY(-50%) scale(1.35);
+  background-color: #60a5fa;
+  box-shadow: 0 0 12px #38bdf8;
 }
 
 .flow-port-in {
-  left: -6px;
+  left: -6px; /* 直径12pxの半径分だけ外側に出すことで、中心がカードの左ボーダーと完全一致 */
 }
 
 .flow-port-out {
-  right: -6px;
+  right: -6px; /* 直径12pxの半径分だけ外側に出すことで、中心がカードの右ボーダーと完全一致 */
 }
 
 .flow-node-card.danger-node {
@@ -1794,6 +2027,12 @@ body {
   box-shadow: 0 0 6px #ef4444;
 }
 
+.flow-node-card.danger-node .flow-port:hover,
+.flow-node-card.danger-node .flow-port.port-active {
+  background-color: #f87171;
+  box-shadow: 0 0 12px #ef4444;
+}
+
 /* SVGワイヤー結線 (ベジェ曲線アニメーション) */
 .wire-path {
   fill: none;
@@ -1803,10 +2042,25 @@ body {
   stroke-dasharray: 6 3;
   animation: wireFlow 1.2s linear infinite;
   opacity: 0.9;
+  pointer-events: none;
 }
 
 .wire-path.danger-wire {
   stroke: #ef4444;
+}
+
+.wire-click-target {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.wire-click-target:hover + .wire-path {
+  stroke-width: 3.5;
+  stroke: #f87171;
+  filter: drop-shadow(0 0 4px rgba(248, 113, 113, 0.8));
 }
 
 @keyframes wireFlow {

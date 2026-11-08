@@ -1833,6 +1833,436 @@ Object.assign(BUILTIN_BLOCKS, {
       }
       return `try { ${c} } catch { Write-Output "[情報] エラーが発生しましたが安全に続行しました: $($_.Exception.Message)" }`;
     }
+  },
+
+  'kill-process': {
+    name: '指定したプロセスを強制終了 (taskkill)',
+    category: 'process',
+    cmd: 'taskkill / kill',
+    isDanger: true,
+    fields: [
+      { id: 'target', label: 'プロセス名 または PID', type: 'text', placeholder: '例: notepad.exe または 1234', default: 'notepad.exe' },
+      { id: 'force', label: '終了モード', type: 'select', options: [
+        { value: 'force', label: '強制終了 (推奨: 固まったアプリを即停止)' },
+        { value: 'normal', label: '通常終了 (保存確認などを促す)' }
+      ], default: 'force' }
+    ],
+    generateCommand: (params) => {
+      const tgt = resolveVariables(params.target);
+      if (!tgt) return '# 終了するプロセス名またはPIDを入力してください';
+      const isNum = /^\d+$/.test(tgt.trim());
+      if (isUnix()) {
+        if (isNum) return `kill ${params.force === 'force' ? '-9 ' : ''}${tgt} && echo "プロセス(PID: ${tgt})を終了しました"`;
+        return `pkill ${params.force === 'force' ? '-9 ' : ''}-f "${tgt}" && echo "プロセス(${tgt})を終了しました"`;
+      }
+      if (isNum) {
+        return `Stop-Process -Id ${tgt} ${params.force === 'force' ? '-Force ' : ''}-PassThru; Write-Output "PID: ${tgt} を終了しました"`;
+      }
+      const cleanName = tgt.replace(/\.exe$/i, '');
+      return `Stop-Process -Name "${cleanName}" ${params.force === 'force' ? '-Force ' : ''}-ErrorAction SilentlyContinue; taskkill.exe /F /IM "${cleanName}.exe" 2>$null; Write-Output "プロセス [${cleanName}] を終了しました"`;
+    }
+  },
+
+  'calc-hash': {
+    name: 'ファイルの整合性・ハッシュ値検証 (Get-FileHash)',
+    category: 'file',
+    cmd: 'Get-FileHash / sha256',
+    fields: [
+      { id: 'path', label: '対象ファイル', type: 'text', placeholder: '例: ./installer.exe', default: '' },
+      { id: 'algo', label: '計算アルゴリズム', type: 'select', options: [
+        { value: 'SHA256', label: 'SHA256 (標準・推奨)' },
+        { value: 'MD5', label: 'MD5 (旧式・軽量)' },
+        { value: 'SHA1', label: 'SHA1' },
+        { value: 'SHA512', label: 'SHA512 (最高強度)' }
+      ], default: 'SHA256' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.path);
+      if (!p) return '# ハッシュを計算するファイルを入力してください';
+      const algo = params.algo || 'SHA256';
+      if (isUnix()) {
+        if (algo === 'MD5') return `md5sum "${p}" 2>/dev/null || md5 "${p}"`;
+        return `shasum -a 256 "${p}" 2>/dev/null || sha256sum "${p}"`;
+      }
+      return `Get-FileHash -Path "${p}" -Algorithm ${algo} | Format-List`;
+    }
+  },
+
+  'replace-in-files': {
+    name: 'ファイル内の文字列を一括置換 (-replace / sed)',
+    category: 'file',
+    cmd: 'replace / sed',
+    fields: [
+      { id: 'path', label: '対象ファイル', type: 'text', placeholder: '例: ./config.json', default: './config.txt' },
+      { id: 'search', label: '検索する文字列', type: 'text', placeholder: '例: http://localhost', default: 'http://localhost' },
+      { id: 'replace', label: '置換後の文字列', type: 'text', placeholder: '例: https://example.com', default: 'https://example.com' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.path);
+      const s = resolveVariables(params.search);
+      const r = resolveVariables(params.replace) || '';
+      if (!p || !s) return '# ファイルパスと検索文字列を入力してください';
+      if (isUnix()) {
+        return `sed -i.bak 's/${s}/${r}/g' "${p}" && echo "置換が完了しました: ${p}"`;
+      }
+      return `(Get-Content -Path "${p}" -Raw -Encoding utf8) -replace [regex]::Escape('${s}'), '${r}' | Set-Content -Path "${p}" -Encoding utf8; Write-Output "ファイル内の文字列を置換しました: ${p}"`;
+    }
+  },
+
+  'touch-file': {
+    name: '空ファイル作成・更新日時を現在に (touch)',
+    category: 'file',
+    cmd: 'touch / New-Item',
+    fields: [
+      { id: 'path', label: 'ファイル名 / パス', type: 'text', placeholder: '例: ./app.log', default: './new_file.txt' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.path);
+      if (!p) return '# ファイルパスを入力してください';
+      if (isUnix()) return `touch "${p}" && echo "ファイル/タイムスタンプを更新しました: ${p}"`;
+      return `if (Test-Path "${p}") { (Get-Item "${p}").LastWriteTime = Get-Date; Write-Output "タイムスタンプを現在時刻に更新しました: ${p}" } else { New-Item -ItemType File -Path "${p}" -Force; Write-Output "新規空ファイルを作成しました: ${p}" }`;
+    }
+  },
+
+  'tail-file': {
+    name: 'ログファイルの末尾を追跡監視 (tail -f)',
+    category: 'file',
+    cmd: 'tail -f / Get-Content -Wait',
+    fields: [
+      { id: 'path', label: '監視するログファイル', type: 'text', placeholder: '例: ./server.log', default: './app.log' },
+      { id: 'lines', label: '初期表示行数', type: 'text', placeholder: '例: 30', default: '30' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.path);
+      const n = resolveVariables(params.lines) || '30';
+      if (!p) return '# ログファイルパスを入力してください';
+      if (isUnix()) return `tail -n ${n} -f "${p}"`;
+      return `Get-Content -Path "${p}" -Tail ${n} -Wait`;
+    }
+  },
+
+  'git-clone': {
+    name: 'Gitリポジトリをダウンロード (git clone)',
+    category: 'dev',
+    cmd: 'git clone',
+    fields: [
+      { id: 'repo', label: 'リポジトリURL', type: 'text', placeholder: '例: https://github.com/user/repo.git', default: '' },
+      { id: 'dir', label: '保存先フォルダ名 (省略可)', type: 'text', placeholder: '例: my-project', default: '' }
+    ],
+    generateCommand: (params) => {
+      const repo = resolveVariables(params.repo);
+      const dir = resolveVariables(params.dir);
+      if (!repo) return '# リポジトリURLを入力してください';
+      return `git clone "${repo}" ${dir ? `"${dir}"` : ''}`;
+    }
+  },
+
+  'git-commit-push': {
+    name: '全変更をGitコミット＆プッシュ (git commit & push)',
+    category: 'dev',
+    cmd: 'git commit & push',
+    fields: [
+      { id: 'message', label: 'コミットメッセージ', type: 'text', placeholder: '例: Update configuration', default: 'Update workflows' },
+      { id: 'branch', label: '送信先ブランチ', type: 'text', placeholder: '例: main', default: 'main' }
+    ],
+    generateCommand: (params) => {
+      const msg = resolveVariables(params.message) || 'Update';
+      const branch = resolveVariables(params.branch) || 'main';
+      return `git add -A && git commit -m "${msg}" && git push origin ${branch}`;
+    }
+  },
+
+  'docker-manage': {
+    name: 'Dockerコンテナ操作・確認 (docker)',
+    category: 'dev',
+    cmd: 'docker',
+    fields: [
+      { id: 'action', label: '操作', type: 'select', options: [
+        { value: 'ps', label: '稼働中コンテナ一覧 (docker ps)' },
+        { value: 'ps-a', label: '全コンテナ一覧 (停止中含む) (docker ps -a)' },
+        { value: 'images', label: 'イメージ一覧 (docker images)' },
+        { value: 'start', label: 'コンテナ起動 (docker start)' },
+        { value: 'stop', label: 'コンテナ停止 (docker stop)' },
+        { value: 'restart', label: 'コンテナ再起動 (docker restart)' },
+        { value: 'compose-up', label: 'Compose一括起動 (docker compose up -d)' },
+        { value: 'compose-down', label: 'Compose停止 (docker compose down)' }
+      ], default: 'ps' },
+      { id: 'target', label: '対象コンテナ名 (起動/停止時)', type: 'text', placeholder: '例: my-web-app', default: '' }
+    ],
+    generateCommand: (params) => {
+      const act = params.action;
+      const tgt = resolveVariables(params.target);
+      if (act === 'ps') return `docker ps`;
+      if (act === 'ps-a') return `docker ps -a`;
+      if (act === 'images') return `docker images`;
+      if (act === 'compose-up') return `docker compose up -d`;
+      if (act === 'compose-down') return `docker compose down`;
+      if (!tgt) return `# ${act} の対象コンテナ名を入力してください`;
+      return `docker ${act} "${tgt}"`;
+    }
+  },
+
+  'wsl-exec': {
+    name: 'WSL/Linux環境でコマンド実行 (wsl.exe)',
+    category: 'dev',
+    cmd: 'wsl.exe',
+    fields: [
+      { id: 'command', label: 'Linux上で動かす命令', type: 'text', placeholder: '例: uname -a; df -h', default: 'uname -a' }
+    ],
+    generateCommand: (params) => {
+      const cmd = resolveVariables(params.command) || 'uname -a';
+      if (isUnix()) return `${cmd}`;
+      return `wsl.exe --exec sh -c "${cmd.replaceAll('"', '\\"')}"`;
+    }
+  },
+
+  'ssh-exec': {
+    name: 'リモートサーバーにSSH遠隔コマンド実行 (ssh)',
+    category: 'network',
+    cmd: 'ssh remote',
+    fields: [
+      { id: 'host', label: '接続先 (user@host)', type: 'text', placeholder: '例: ubuntu@192.168.1.50', default: '' },
+      { id: 'port', label: 'ポート番号', type: 'text', placeholder: '例: 22', default: '22' },
+      { id: 'command', label: '実行する命令', type: 'text', placeholder: '例: uptime; free -m', default: 'uptime' }
+    ],
+    generateCommand: (params) => {
+      const h = resolveVariables(params.host);
+      const p = resolveVariables(params.port) || '22';
+      const c = resolveVariables(params.command) || 'uptime';
+      if (!h) return '# 接続先 (user@host) を入力してください';
+      return `ssh -p ${p} -o StrictHostKeyChecking=accept-new "${h}" "${c}"`;
+    }
+  },
+
+  'defender-scan': {
+    name: 'Windows Defenderで即座にウイルス検査 (Start-MpScan)',
+    category: 'security',
+    cmd: 'Start-MpScan',
+    fields: [
+      { id: 'scanType', label: 'スキャン種類', type: 'select', options: [
+        { value: 'QuickScan', label: 'クイックスキャン (主要領域を高速検査)' },
+        { value: 'FullScan', label: 'フルスキャン (全ファイルを徹底検査)' }
+      ], default: 'QuickScan' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) return `echo "Mac/LinuxではClamAV (clamscan) または標準保護システムをご利用ください"`;
+      return `Start-MpScan -ScanType ${params.scanType}; Write-Output "Windows Defender のスキャン (${params.scanType}) が完了しました"`;
+    }
+  },
+
+  'firewall-rule': {
+    name: '特定ポートの通信を許可/ブロック (New-NetFirewallRule)',
+    category: 'security',
+    cmd: 'firewall rule',
+    isDanger: true,
+    fields: [
+      { id: 'name', label: 'ルール名', type: 'text', placeholder: '例: CustomApp_Port8080', default: 'MyCustomPortRule' },
+      { id: 'port', label: 'ポート番号', type: 'text', placeholder: '例: 8080', default: '8080' },
+      { id: 'protocol', label: 'プロトコル', type: 'select', options: [
+        { value: 'TCP', label: 'TCP' },
+        { value: 'UDP', label: 'UDP' }
+      ], default: 'TCP' },
+      { id: 'action', label: '動作', type: 'select', options: [
+        { value: 'Allow', label: '受信を許可 (ポート開放)' },
+        { value: 'Block', label: '受信をブロック (遮断)' }
+      ], default: 'Allow' }
+    ],
+    generateCommand: (params) => {
+      const name = resolveVariables(params.name) || 'CustomRule';
+      const port = resolveVariables(params.port) || '8080';
+      if (isUnix()) return `echo "Mac/Linuxではufwまたはpfctlでポート管理を行います"`;
+      return `New-NetFirewallRule -DisplayName "${name}" -Direction Inbound -LocalPort ${port} -Protocol ${params.protocol} -Action ${params.action}; Write-Output "ファイアウォールルール [${name}] (ポート:${port} / ${params.action}) を登録しました"`;
+    }
+  },
+
+  'screen-capture': {
+    name: 'PC画面のスクリーンショットを自動撮影 (ScreenCapture)',
+    category: 'system',
+    cmd: 'screenshot',
+    fields: [
+      { id: 'path', label: '保存先ファイル名', type: 'text', placeholder: '例: ./screenshot.png', default: './screenshot.png' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.path) || './screenshot.png';
+      if (isUnix()) {
+        return `screencapture -x "${p}" 2>/dev/null || import -window root "${p}" 2>/dev/null && echo "スクリーンショットを保存しました: ${p}"`;
+      }
+      return `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; $bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height; $gfx = [System.Drawing.Graphics]::FromImage($bmp); $gfx.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size); $bmp.Save("${p}", [System.Drawing.Imaging.ImageFormat]::Png); $gfx.Dispose(); $bmp.Dispose(); Write-Output "画面スクリーンショットを保存しました: ${p}"`;
+    }
+  },
+
+  'fsutil-manage': {
+    name: '巨大ダミーファイル作成・ファイルシステム管理 (fsutil)',
+    category: 'storage',
+    cmd: 'fsutil',
+    fields: [
+      { id: 'action', label: '操作', type: 'select', options: [
+        { value: 'createnew', label: '指定容量の空ダミーファイル瞬時生成' },
+        { value: 'diskfree', label: 'ドライブ空き領域の詳細確認' }
+      ], default: 'createnew' },
+      { id: 'path', label: 'ファイル名 / ドライブ', type: 'text', placeholder: '例: ./dummy_100mb.dat または C:', default: './test_dummy.dat' },
+      { id: 'sizeMb', label: '作成サイズ (MB単位)', type: 'text', placeholder: '例: 100', default: '50' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.path) || './test_dummy.dat';
+      const mb = parseInt(resolveVariables(params.sizeMb)) || 50;
+      const bytes = mb * 1024 * 1024;
+      if (isUnix()) {
+        if (params.action === 'diskfree') return `df -h "${p}"`;
+        return `truncate -s ${mb}M "${p}" 2>/dev/null || dd if=/dev/zero of="${p}" bs=1M count=${mb} 2>/dev/null && echo "ダミーファイルを作成しました: ${p} (${mb}MB)"`;
+      }
+      if (params.action === 'diskfree') {
+        return `fsutil volume diskfree ${p}`;
+      }
+      return `fsutil file createnew "${p}" ${bytes}; Write-Output "ダミーファイルを作成しました: ${p} (${mb}MB)"`;
+    }
+  },
+
+  'compact-compress': {
+    name: 'NTFS透過圧縮で空き容量を節約 (compact)',
+    category: 'storage',
+    cmd: 'compact',
+    fields: [
+      { id: 'mode', label: '操作', type: 'select', options: [
+        { value: 'compress', label: 'フォルダ内をまるごと透過圧縮' },
+        { value: 'uncompress', label: '圧縮を解除 (通常に戻す)' },
+        { value: 'query', label: '現在の圧縮率・状態を確認' }
+      ], default: 'compress' },
+      { id: 'path', label: '対象フォルダ', type: 'text', placeholder: '例: ./logs または C:\\data', default: '.' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.path) || '.';
+      if (isUnix()) return `echo "Mac/Linuxでは標準のgzip/bzip2またはAPFS/Btrfs圧縮をご利用ください"`;
+      if (params.mode === 'compress') return `compact /c /s:"${p}" /i /q; Write-Output "フォルダ内のNTFS透過圧縮を完了しました: ${p}"`;
+      if (params.mode === 'uncompress') return `compact /u /s:"${p}" /i /q; Write-Output "フォルダ内の透過圧縮を解除しました: ${p}"`;
+      return `compact "${p}"`;
+    }
+  },
+
+  'vssadmin-shadows': {
+    name: 'バックアップ復元ポイント・シャドウコピー確認 (vssadmin)',
+    category: 'storage',
+    cmd: 'vssadmin',
+    fields: [
+      { id: 'action', label: '操作', type: 'select', options: [
+        { value: 'shadows', label: '復元ポイント(シャドウコピー)一覧' },
+        { value: 'providers', label: '登録されているVSSプロバイダー一覧' },
+        { value: 'writers', label: 'VSSライターの稼働健全性チェック' }
+      ], default: 'shadows' }
+    ],
+    generateCommand: (params) => {
+      if (isUnix()) return `tmutil listbackups 2>/dev/null || btrfs subvolume list / 2>/dev/null || echo "MacのTime MachineバックアップまたはLinuxスナップショット一覧"`;
+      if (params.action === 'providers') return `vssadmin list providers`;
+      if (params.action === 'writers') return `vssadmin list writers`;
+      return `vssadmin list shadows`;
+    }
+  },
+
+  'tzutil-timezone': {
+    name: 'OSのタイムゾーン確認・設定 (tzutil)',
+    category: 'system',
+    cmd: 'tzutil',
+    fields: [
+      { id: 'action', label: '操作', type: 'select', options: [
+        { value: 'get', label: '現在のタイムゾーンを表示' },
+        { value: 'list', label: '利用可能な全タイムゾーン一覧' },
+        { value: 'set', label: 'タイムゾーンを変更設定' }
+      ], default: 'get' },
+      { id: 'zone', label: '設定するタイムゾーン名 (変更時)', type: 'text', placeholder: '例: Tokyo Standard Time', default: 'Tokyo Standard Time' }
+    ],
+    generateCommand: (params) => {
+      const z = resolveVariables(params.zone) || 'Tokyo Standard Time';
+      if (isUnix()) {
+        if (params.action === 'get') return `timedatectl status 2>/dev/null || date +"タイムゾーン: %Z (%z)"`;
+        if (params.action === 'list') return `timedatectl list-timezones 2>/dev/null | head -n 30 || echo "タイムゾーン一覧"`;
+        return `echo "Mac/Linuxでは 'sudo timedatectl set-timezone ${z}' またはシステム環境設定から変更します"`;
+      }
+      if (params.action === 'get') return `tzutil /g`;
+      if (params.action === 'list') return `tzutil /l`;
+      return `tzutil /s "${z}"; Write-Output "タイムゾーンを [${z}] に設定しました"`;
+    }
+  },
+
+  'quser-sessions': {
+    name: 'ログオン中ユーザー・リモート接続一覧 (quser)',
+    category: 'system',
+    cmd: 'quser / who',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `who -u 2>/dev/null || w`;
+      return `cmd.exe /c "quser 2>nul || query user 2>nul" || Get-CimInstance Win32_LogonSession | Select-Object LogonId, StartTime, LogonType | Format-Table -AutoSize`;
+    }
+  },
+
+  'openfiles-query': {
+    name: 'ネットワーク共有で開かれているファイル調査 (openfiles)',
+    category: 'network',
+    cmd: 'openfiles',
+    fields: [],
+    generateCommand: () => {
+      if (isUnix()) return `lsof -i 2>/dev/null | head -n 25 || echo "ネットワーク共有で開かれているファイル"`;
+      return `Get-SmbOpenFile -ErrorAction SilentlyContinue | Select-Object FileId, SessionId, Path, ClientUserName | Format-Table -AutoSize || openfiles.exe /query /fo table 2>$null`;
+    }
+  },
+
+  'label-drive': {
+    name: 'ドライブのボリューム表示名を変更 (label)',
+    category: 'storage',
+    cmd: 'label',
+    fields: [
+      { id: 'drive', label: '対象ドライブ', type: 'text', placeholder: '例: D:', default: 'D:' },
+      { id: 'newLabel', label: '新しいボリューム名', type: 'text', placeholder: '例: BackupDrive', default: 'BackupDrive' }
+    ],
+    generateCommand: (params) => {
+      const d = resolveVariables(params.drive).replace(':', '') || 'D';
+      const lbl = resolveVariables(params.newLabel) || 'MyDrive';
+      if (isUnix()) return `echo "Mac: diskutil rename / Linux: e2label をご利用ください"`;
+      return `label ${d}: "${lbl}"; Write-Output "ドライブ ${d}: の名前を [${lbl}] に設定しました"`;
+    }
+  },
+
+  'ftype-assoc': {
+    name: 'ファイルタイプの実行コマンド定義調査 (ftype)',
+    category: 'system',
+    cmd: 'ftype',
+    fields: [
+      { id: 'fileType', label: 'ファイルタイプ名 (省略で一覧)', type: 'text', placeholder: '例: txtfile, exefile', default: 'txtfile' }
+    ],
+    generateCommand: (params) => {
+      const t = resolveVariables(params.fileType) || '';
+      if (isUnix()) return `xdg-mime query default "text/plain" 2>/dev/null || echo "関連付け情報"`;
+      return `cmd.exe /c "ftype ${t}"`;
+    }
+  },
+
+  'choice-prompt': {
+    name: '[Y/N] キー選択入力を待機 (choice)',
+    category: 'logic',
+    cmd: 'choice / read',
+    fields: [
+      { id: 'message', label: '表示する案内文', type: 'text', placeholder: '例: 本当に続行しますか？', default: '続行しますか？' },
+      { id: 'choices', label: '選択できるキー', type: 'text', placeholder: '例: YN, ABC', default: 'YN' }
+    ],
+    generateCommand: (params) => {
+      const msg = resolveVariables(params.message) || '続行しますか？';
+      const ch = resolveVariables(params.choices) || 'YN';
+      if (isUnix()) return `read -p "${msg} [${ch}]: " -n 1 user_input && echo "" && echo "入力: $user_input"`;
+      return `choice.exe /C ${ch} /M "${msg}"`;
+    }
+  },
+
+  'pushd-dir': {
+    name: '一時的なフォルダ/共有パス移動 (pushd)',
+    category: 'file',
+    cmd: 'pushd',
+    fields: [
+      { id: 'path', label: '移動先パス (UNC共有パス可)', type: 'text', placeholder: '例: \\\\server\\share または ./src', default: './' }
+    ],
+    generateCommand: (params) => {
+      const p = resolveVariables(params.path) || './';
+      if (isUnix()) return `pushd "${p}" && pwd`;
+      return `Push-Location "${p}"; Write-Output "移動後の現在フォルダ: $(Get-Location)"`;
+    }
   }
 });
 
@@ -1882,7 +2312,42 @@ const PRESETS = {
 };
 
 // 2. アプリの状態管理
+let workflowTabs = [
+  { id: 'tab-1', title: 'ワークフロー 1', blocks: [], connections: [], undoStack: [], redoStack: [] }
+];
+let activeTabId = 'tab-1';
+
+function getActiveTab() {
+  let t = workflowTabs.find(tab => tab.id === activeTabId);
+  if (!t) {
+    t = workflowTabs[0] || { id: 'tab-1', title: 'ワークフロー 1', blocks: [], connections: [], undoStack: [], redoStack: [] };
+    activeTabId = t.id;
+  }
+  return t;
+}
+
+// 既存グローバル変数をアクティブタブの参照に連動
 let blocks = [];
+let connections = [];
+let undoStack = [];
+let redoStack = [];
+
+function syncFromActiveTab() {
+  const t = getActiveTab();
+  blocks = t.blocks;
+  connections = t.connections || (t.connections = []);
+  undoStack = t.undoStack || (t.undoStack = []);
+  redoStack = t.redoStack || (t.redoStack = []);
+}
+
+function syncToActiveTab() {
+  const t = getActiveTab();
+  t.blocks = blocks;
+  t.connections = connections;
+  t.undoStack = undoStack;
+  t.redoStack = redoStack;
+}
+
 let currentCwd = '';
 let showInternalCommands = true;
 let isDemoMode = false;
@@ -1890,11 +2355,22 @@ let currentViewMode = 'stack'; // 'stack' (リスト表示) | 'node' (ノード�
 let currentTheme = 'light'; // 'light' | 'dark'
 let isStepRunning = false; // ステップ実行中フラグ
 let currentStepIndex = 0; // 現在実行中のステップ番号
-let undoStack = [];
-let redoStack = [];
 let nodeZoomLevel = 1.0;
+let draggingWire = null; // 端子ドラッグ結線中オブジェクト { fromId: string, portType: 'out', startX: number, startY: number }
 
 // DOM要素
+const tabsList = document.getElementById('tabsList');
+const btnNewTab = document.getElementById('btnNewTab');
+const btnScheduleModal = document.getElementById('btnScheduleModal');
+const scheduleModal = document.getElementById('scheduleModal');
+const btnScheduleClose = document.getElementById('btnScheduleClose');
+const btnScheduleCancel = document.getElementById('btnScheduleCancel');
+const btnRegisterSchedule = document.getElementById('btnRegisterSchedule');
+const scheduleTaskName = document.getElementById('scheduleTaskName');
+const scheduleFrequency = document.getElementById('scheduleFrequency');
+const scheduleTime = document.getElementById('scheduleTime');
+const scheduleCmdPreview = document.getElementById('scheduleCmdPreview');
+
 const canvas = document.getElementById('canvas');
 const canvasStack = document.getElementById('canvasStack');
 const canvasNodeGraph = document.getElementById('canvasNodeGraph');
@@ -2214,6 +2690,7 @@ function renderErrorDiagnosis(diag) {
 
 // Undo / Redo 管理
 function pushHistory() {
+  syncToActiveTab();
   undoStack.push(JSON.stringify(blocks));
   if (undoStack.length > 40) undoStack.shift();
   redoStack = [];
@@ -2229,6 +2706,7 @@ function undo() {
   if (undoStack.length === 0) return;
   redoStack.push(JSON.stringify(blocks));
   blocks = JSON.parse(undoStack.pop());
+  syncToActiveTab();
   renderCanvas();
   updateUndoRedoButtons();
 }
@@ -2237,8 +2715,161 @@ function redo() {
   if (redoStack.length === 0) return;
   undoStack.push(JSON.stringify(blocks));
   blocks = JSON.parse(redoStack.pop());
+  syncToActiveTab();
   renderCanvas();
   updateUndoRedoButtons();
+}
+
+// ワークフロー タブ管理 (マルチタブ)
+function renderWorkflowTabs() {
+  if (!tabsList) return;
+  tabsList.innerHTML = '';
+
+  workflowTabs.forEach((tab) => {
+    const item = document.createElement('div');
+    item.className = `tab-item ${tab.id === activeTabId ? 'active' : ''}`;
+    item.setAttribute('data-tab-id', tab.id);
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'tab-title';
+    titleSpan.textContent = tab.title || 'ワークフロー';
+    titleSpan.title = 'ダブルクリックで名前を変更できます';
+
+    titleSpan.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      const newTitle = prompt('ワークフローの名前を入力してください：', tab.title);
+      if (newTitle && newTitle.trim()) {
+        tab.title = newTitle.trim();
+        renderWorkflowTabs();
+      }
+    });
+
+    item.appendChild(titleSpan);
+
+    if (workflowTabs.length > 1) {
+      const closeBtn = document.createElement('span');
+      closeBtn.className = 'tab-close';
+      closeBtn.textContent = '✕';
+      closeBtn.title = 'タブを閉じる';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeWorkflowTab(tab.id);
+      });
+      item.appendChild(closeBtn);
+    }
+
+    item.addEventListener('click', () => {
+      switchWorkflowTab(tab.id);
+    });
+
+    tabsList.appendChild(item);
+  });
+}
+
+function switchWorkflowTab(tabId) {
+  if (tabId === activeTabId) return;
+  syncToActiveTab();
+  activeTabId = tabId;
+  syncFromActiveTab();
+  renderWorkflowTabs();
+  renderCanvas();
+  updateUndoRedoButtons();
+}
+
+function addWorkflowTab() {
+  syncToActiveTab();
+  const nextNum = workflowTabs.length + 1;
+  const newTab = {
+    id: `tab-${Date.now()}`,
+    title: `ワークフロー ${nextNum}`,
+    blocks: [],
+    connections: [],
+    undoStack: [],
+    redoStack: []
+  };
+  workflowTabs.push(newTab);
+  activeTabId = newTab.id;
+  syncFromActiveTab();
+  renderWorkflowTabs();
+  renderCanvas();
+  updateUndoRedoButtons();
+}
+
+function removeWorkflowTab(tabId) {
+  if (workflowTabs.length <= 1) return;
+  const idx = workflowTabs.findIndex(t => t.id === tabId);
+  if (idx < 0) return;
+  
+  if (confirm(`「${workflowTabs[idx].title}」を閉じますか？`)) {
+    workflowTabs.splice(idx, 1);
+    if (activeTabId === tabId) {
+      activeTabId = workflowTabs[Math.max(0, idx - 1)].id;
+    }
+    syncFromActiveTab();
+    renderWorkflowTabs();
+    renderCanvas();
+    updateUndoRedoButtons();
+  }
+}
+
+// ファイル・フォルダ ドラッグ＆ドロップ入力バインド
+function setupFileDropOnInput(inputEl, blockIndex, fieldId) {
+  if (!inputEl) return;
+  inputEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    inputEl.classList.add('drag-over-input');
+  });
+  inputEl.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    inputEl.classList.remove('drag-over-input');
+  });
+  inputEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    inputEl.classList.remove('drag-over-input');
+
+    let path = '';
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      path = file.path || file.name;
+    } else {
+      path = e.dataTransfer.getData('text/plain') || '';
+    }
+
+    if (path) {
+      inputEl.value = path.trim();
+      if (blocks[blockIndex]) {
+        blocks[blockIndex].params[fieldId] = path.trim();
+        pushHistory();
+        updateNodeWires();
+      }
+    }
+  });
+}
+
+// 定時実行スケジュール登録プレビュー更新
+function updateScheduleCmdPreview() {
+  if (!scheduleCmdPreview) return;
+  const taskName = (scheduleTaskName.value || 'GraphicalTerminal_Workflow').trim().replace(/[^a-zA-Z0-9_\-]/g, '_');
+  const freq = scheduleFrequency.value;
+  const time = scheduleTime.value || '09:00';
+
+  let scriptFile = `${currentCwd || 'C:\\Workspace'}\\workflow_schedule.ps1`;
+  let cmd = '';
+
+  if (freq === 'DAILY') {
+    cmd = `schtasks /create /tn "${taskName}" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"${scriptFile}\\"" /sc DAILY /st ${time} /f`;
+  } else if (freq === 'WEEKLY') {
+    cmd = `schtasks /create /tn "${taskName}" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"${scriptFile}\\"" /sc WEEKLY /d MON /st ${time} /f`;
+  } else if (freq === 'HOURLY') {
+    cmd = `schtasks /create /tn "${taskName}" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"${scriptFile}\\"" /sc HOURLY /f`;
+  } else if (freq === 'ONLOGON') {
+    cmd = `schtasks /create /tn "${taskName}" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"${scriptFile}\\"" /sc ONLOGON /f`;
+  }
+
+  scheduleCmdPreview.textContent = cmd;
 }
 
 // テーマ管理 (ダークモード / ライトモード)
@@ -2286,6 +2917,8 @@ async function init() {
   loadUserBlocks();
   await fetchCwd();
   adaptBadgesForUnix();
+  syncFromActiveTab();
+  renderWorkflowTabs();
   setupEventListeners();
   renderCatalogGrid('');
   loadPreset('date-backup');
@@ -2645,6 +3278,60 @@ function setupEventListeners() {
   // 🧹 ノード自動整列ボタン
   if (btnAlignNodes) {
     btnAlignNodes.addEventListener('click', alignNodes);
+  }
+
+  // ➕ 新規ワークフロータブ作成ボタン
+  if (btnNewTab) {
+    btnNewTab.addEventListener('click', addWorkflowTab);
+  }
+
+  // ⏰ 定時実行スケジュール登録モーダル関連 (Windowsタスクスケジューラ連携)
+  if (btnScheduleModal && scheduleModal) {
+    btnScheduleModal.addEventListener('click', () => {
+      if (blocks.length === 0) {
+        alert('定時実行するブロックがありません。まずキャンバスにブロックを並べてください。');
+        return;
+      }
+      updateScheduleCmdPreview();
+      scheduleModal.classList.remove('hidden');
+    });
+  }
+
+  if (btnScheduleClose) {
+    btnScheduleClose.addEventListener('click', () => scheduleModal.classList.add('hidden'));
+  }
+  if (btnScheduleCancel) {
+    btnScheduleCancel.addEventListener('click', () => scheduleModal.classList.add('hidden'));
+  }
+
+  if (scheduleFrequency) scheduleFrequency.addEventListener('change', updateScheduleCmdPreview);
+  if (scheduleTime) scheduleTime.addEventListener('input', updateScheduleCmdPreview);
+  if (scheduleTaskName) scheduleTaskName.addEventListener('input', updateScheduleCmdPreview);
+
+  if (btnRegisterSchedule) {
+    btnRegisterSchedule.addEventListener('click', () => {
+      const taskName = (scheduleTaskName.value || 'GraphicalTerminal_Workflow').trim().replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const freq = scheduleFrequency.value;
+      const time = scheduleTime.value || '09:00';
+
+      const scriptContent = buildFullScript();
+      const saveCmd = `$scriptDir = "${currentCwd || 'C:\\Workspace'}"; if (!(Test-Path $scriptDir)) { New-Item -ItemType Directory -Path $scriptDir -Force }; $scriptPath = "$scriptDir\\workflow_schedule.ps1"; @'\n${scriptContent}\n'@ | Set-Content -Path $scriptPath -Encoding UTF8; `;
+      
+      let schCmd = '';
+      if (freq === 'DAILY') {
+        schCmd = `schtasks /create /tn "${taskName}" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"$scriptPath\\"" /sc DAILY /st ${time} /f`;
+      } else if (freq === 'WEEKLY') {
+        schCmd = `schtasks /create /tn "${taskName}" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"$scriptPath\\"" /sc WEEKLY /d MON /st ${time} /f`;
+      } else if (freq === 'HOURLY') {
+        schCmd = `schtasks /create /tn "${taskName}" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"$scriptPath\\"" /sc HOURLY /f`;
+      } else if (freq === 'ONLOGON') {
+        schCmd = `schtasks /create /tn "${taskName}" /tr "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"$scriptPath\\"" /sc ONLOGON /f`;
+      }
+
+      const fullRegisterCmd = `${saveCmd}${schCmd}; Write-Output "Windowsタスクスケジューラにタスク [${taskName}] を正常に登録しました！"`;
+      scheduleModal.classList.add('hidden');
+      executeScript(fullRegisterCmd);
+    });
   }
 
   // 📥 スクリプト書き出しモーダル関連
@@ -3041,10 +3728,15 @@ function renderCanvas() {
     // ヘッダー
     const header = document.createElement('div');
     header.className = 'block-card-header';
+    const statusText = b._status === 'running' 
+      ? '実行中...' 
+      : (b._status === 'success' ? `✓ ${b._duration || '0.05s'}` : (b._status === 'error' ? '✕ エラー' : ''));
+
     header.innerHTML = `
       <div class="block-card-title">
         <span class="drag-handle" title="ドラッグして並べ替え">⠿</span>
         <span class="block-name">${def.name}</span>
+        <span class="block-status-badge ${b._status || 'idle'}">${statusText}</span>
       </div>
       <div class="block-card-controls">
         <button class="icon-btn btn-up" title="上へ移動" ${index === 0 ? 'disabled style="opacity:0.3;"' : ''}>▲</button>
@@ -3100,8 +3792,9 @@ function renderCanvas() {
           input = document.createElement('input');
           input.type = 'text';
           input.className = 'form-input';
-          input.placeholder = field.placeholder || '';
+          input.placeholder = field.placeholder || '（ファイルをドラッグ＆ドロップでも入力可）';
           input.value = b.params[field.id] || '';
+          setupFileDropOnInput(input, index, field.id);
         }
 
         input.addEventListener('input', (e) => {
@@ -3185,10 +3878,15 @@ function renderNodeGraph() {
     const header = document.createElement('div');
     header.className = 'flow-node-header';
     header.title = 'ドラッグして自由に移動できます';
+    const statusText = b._status === 'running' 
+      ? '実行中...' 
+      : (b._status === 'success' ? `✓ ${b._duration || '0.05s'}` : (b._status === 'error' ? '✕ エラー' : ''));
+
     header.innerHTML = `
       <div class="flow-node-meta">
         <span class="flow-node-step">Step ${index + 1}</span>
         <span class="flow-node-cmd">${def.cmd || def.category || 'cmd'}</span>
+        <span class="block-status-badge ${b._status || 'idle'}">${statusText}</span>
       </div>
       <div class="flow-node-controls">
         <button class="icon-btn btn-node-up" title="前へ移動" ${index === 0 ? 'disabled style="opacity:0.3;"' : ''}>▲</button>
@@ -3274,8 +3972,9 @@ function renderNodeGraph() {
           input = document.createElement('input');
           input.type = 'text';
           input.className = 'form-input';
-          input.placeholder = field.placeholder || '';
+          input.placeholder = field.placeholder || '（ファイルドロップ可）';
           input.value = b.params[field.id] || '';
+          setupFileDropOnInput(input, index, field.id);
         }
 
         input.addEventListener('input', (e) => {
@@ -3308,31 +4007,132 @@ function renderNodeGraph() {
   updateNodeWires();
 }
 
-function setupNodePorts() {
-  nodeCardRegistry.forEach(({ card, index }) => {
-    const cardHeight = card.offsetHeight;
+// ノードカードの端子（IN / OUT）の中心座標を正確に算出
+function getNodePortCenter(item, isOut) {
+  const card = item.card;
+  const port = card ? card.querySelector(isOut ? '.flow-port-out' : '.flow-port-in') : null;
+  const cardX = item.b._pos.x;
+  const cardY = item.b._pos.y;
 
-    // INポート (先頭ノード以外)
-    if (index > 0 && !card.querySelector('.flow-port-in')) {
+  if (port && port.offsetWidth) {
+    // ポートのoffsetLeft（カード左端からの相対位置）にポートの半径を足して幾何中心を算出
+    const portCx = port.offsetLeft + port.offsetWidth / 2;
+    const portCy = port.offsetTop + port.offsetHeight / 2;
+    return {
+      x: cardX + portCx,
+      y: cardY + portCy
+    };
+  }
+
+  // ポート未描画時の精密フォールバック
+  const w = (card && card.offsetWidth) || item.width || 290;
+  const h = (card && card.offsetHeight) || 140;
+  return {
+    x: cardX + (isOut ? w : 0),
+    y: cardY + h / 2
+  };
+}
+
+function setupNodePorts() {
+  nodeCardRegistry.forEach(({ card, b }) => {
+    // INポート (左端: 入力端子) - CSSのtop:50%/translateY(-50%)で自動中央配置
+    if (!card.querySelector('.flow-port-in')) {
       const inPort = document.createElement('div');
       inPort.className = 'flow-port flow-port-in';
-      inPort.style.top = `${cardHeight / 2 - 5}px`;
-      inPort.title = '入力 (IN)';
+      inPort.setAttribute('data-id', b.id);
+      inPort.title = '入力端子 (別のノードの出力を接続)';
       card.appendChild(inPort);
     }
 
-    // OUTポート (末尾ノード以外)
-    if (index < blocks.length - 1 && !card.querySelector('.flow-port-out')) {
+    // OUTポート (右端: 出力端子)
+    if (!card.querySelector('.flow-port-out')) {
       const outPort = document.createElement('div');
       outPort.className = 'flow-port flow-port-out';
-      outPort.style.top = `${cardHeight / 2 - 5}px`;
-      outPort.title = '出力 (OUT)';
+      outPort.setAttribute('data-id', b.id);
+      outPort.title = '出力端子 (ドラッグして別のノードの入力端子へ結線)';
+
+      // 端子ドラッグ結線開始イベント
+      outPort.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const rect = outPort.getBoundingClientRect();
+        const svgRect = nodeWireSvg.getBoundingClientRect();
+        const startX = (rect.left + rect.width / 2 - svgRect.left) / nodeZoomLevel;
+        const startY = (rect.top + rect.height / 2 - svgRect.top) / nodeZoomLevel;
+
+        draggingWire = {
+          fromId: b.id,
+          startX,
+          startY
+        };
+        outPort.classList.add('port-active');
+      });
+
       card.appendChild(outPort);
     }
   });
+
+  setupDraggingWireEvents();
 }
 
-// 🔀 ノード間のベジェ曲線ワイヤーをリアルタイム描画
+let isWireEventsSetup = false;
+function setupDraggingWireEvents() {
+  if (isWireEventsSetup || !nodeGraphViewport) return;
+  isWireEventsSetup = true;
+
+  nodeGraphViewport.addEventListener('mousemove', (e) => {
+    if (!draggingWire) return;
+    const svgRect = nodeWireSvg.getBoundingClientRect();
+    const curX = (e.clientX - svgRect.left) / nodeZoomLevel;
+    const curY = (e.clientY - svgRect.top) / nodeZoomLevel;
+    drawDraggingWire(draggingWire.startX, draggingWire.startY, curX, curY);
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (!draggingWire) return;
+    document.querySelectorAll('.flow-port').forEach(p => p.classList.remove('port-active'));
+
+    const targetPort = document.elementFromPoint(e.clientX, e.clientY);
+    if (targetPort && targetPort.classList.contains('flow-port-in')) {
+      const toId = targetPort.getAttribute('data-id');
+      if (toId && toId !== draggingWire.fromId) {
+        if (!connections.some(c => c.from === draggingWire.fromId && c.to === toId)) {
+          connections.push({ from: draggingWire.fromId, to: toId });
+          syncToActiveTab();
+        }
+      }
+    }
+
+    draggingWire = null;
+    clearDraggingWire();
+    updateNodeWires();
+  });
+}
+
+function drawDraggingWire(x1, y1, x2, y2) {
+  if (!nodeWireSvg) return;
+  let tempPath = nodeWireSvg.querySelector('.temp-drag-wire');
+  if (!tempPath) {
+    tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tempPath.setAttribute('class', 'wire-path temp-drag-wire');
+    tempPath.style.strokeDasharray = '6 6';
+    tempPath.style.stroke = '#38bdf8';
+    tempPath.style.strokeWidth = '2.5px';
+    nodeWireSvg.appendChild(tempPath);
+  }
+  const dx = Math.abs(x2 - x1);
+  const controlDist = Math.max(50, dx * 0.45);
+  const pathD = `M ${x1} ${y1} C ${x1 + controlDist} ${y1}, ${x2 - controlDist} ${y2}, ${x2} ${y2}`;
+  tempPath.setAttribute('d', pathD);
+}
+
+function clearDraggingWire() {
+  if (!nodeWireSvg) return;
+  const tempPath = nodeWireSvg.querySelector('.temp-drag-wire');
+  if (tempPath) tempPath.remove();
+}
+
+// 🔀 ノード間のベジェ曲線ワイヤーをリアルタイム描画 (自由DAG結線 ＆ 直列フォールバック)
 function updateNodeWires() {
   if (!nodeWireSvg) return;
   nodeWireSvg.innerHTML = '';
@@ -3340,42 +4140,55 @@ function updateNodeWires() {
   let maxX = 1200;
   let maxY = 800;
 
-  for (let i = 0; i < nodeCardRegistry.length - 1; i++) {
-    const fromItem = nodeCardRegistry[i];
-    const toItem = nodeCardRegistry[i + 1];
+  // 結線データの決定 (独自結線 connections があればそれを描画、なければ従来の直列接続を描画)
+  let activeWires = [];
+  if (connections && connections.length > 0) {
+    connections.forEach((conn, idx) => {
+      const fromItem = nodeCardRegistry.find(item => item.b.id === conn.from);
+      const toItem = nodeCardRegistry.find(item => item.b.id === conn.to);
+      if (fromItem && toItem) {
+        activeWires.push({ fromItem, toItem, customIndex: idx });
+      }
+    });
+  } else {
+    for (let i = 0; i < nodeCardRegistry.length - 1; i++) {
+      activeWires.push({
+        fromItem: nodeCardRegistry[i],
+        toItem: nodeCardRegistry[i + 1],
+        customIndex: null
+      });
+    }
+  }
 
+  activeWires.forEach(({ fromItem, toItem, customIndex }) => {
     const fromCard = fromItem.card;
     const toCard = toItem.card;
 
-    const fromX = fromItem.b._pos.x;
-    const fromY = fromItem.b._pos.y;
     const fromH = fromCard.offsetHeight || 120;
-
-    const toX = toItem.b._pos.x;
-    const toY = toItem.b._pos.y;
     const toH = toCard.offsetHeight || 120;
 
-    maxX = Math.max(maxX, fromX + 450, toX + 450);
-    maxY = Math.max(maxY, fromY + fromH + 200, toY + toH + 200);
+    maxX = Math.max(maxX, fromItem.b._pos.x + 450, toItem.b._pos.x + 450);
+    maxY = Math.max(maxY, fromItem.b._pos.y + fromH + 200, toItem.b._pos.y + toH + 200);
 
-    const x1 = fromX + fromItem.width;
-    const y1 = fromY + fromH / 2;
-    const x2 = toX;
-    const y2 = toY + toH / 2;
+    // ポートの幾何中心に1ピクセルの隙間もなく吸着
+    const p1 = getNodePortCenter(fromItem, true);
+    const p2 = getNodePortCenter(toItem, false);
+
+    const x1 = p1.x;
+    const y1 = p1.y;
+    const x2 = p2.x;
+    const y2 = p2.y;
 
     const dx = Math.abs(x2 - x1);
     const controlDist = Math.max(50, dx * 0.45);
 
     let pathD = '';
     if (x2 < x1) {
-      // 折り返し・逆方向の結線
-      const cp1x = x1 + 80;
-      const cp1y = y1;
-      const cp2x = x2 - 80;
-      const cp2y = y2;
-      pathD = `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+      // 逆方向結線（左へ折り返す場合）
+      const loopDist = Math.max(70, Math.min(130, (x1 - x2) * 0.4));
+      pathD = `M ${x1} ${y1} C ${x1 + loopDist} ${y1}, ${x2 - loopDist} ${y2}, ${x2} ${y2}`;
     } else {
-      // 通常の左→右配線
+      // 順方向結線（右へ進む場合）
       const cp1x = x1 + controlDist;
       const cp1y = y1;
       const cp2x = x2 - controlDist;
@@ -3383,16 +4196,44 @@ function updateNodeWires() {
       pathD = `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
     }
 
+    // クリック判定用の透明な太い線
+    const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    hitPath.setAttribute('d', pathD);
+    hitPath.setAttribute('class', 'wire-click-target');
+    hitPath.innerHTML = '<title>クリックしてこの結線を切断</title>';
+
+    // 実描画用のベジェ曲線ワイヤー
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', pathD);
     path.setAttribute('class', `wire-path ${fromItem.isDanger || toItem.isDanger ? 'danger-wire' : ''}`);
-    nodeWireSvg.appendChild(path);
-  }
 
-  nodeWireSvg.setAttribute('width', maxX);
-  nodeWireSvg.setAttribute('height', maxY);
-  nodeGraphNodes.style.width = maxX + 'px';
-  nodeGraphNodes.style.height = maxY + 'px';
+    hitPath.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (customIndex !== null) {
+        connections.splice(customIndex, 1);
+      } else {
+        // 直列接続モードで切断された場合、現在の直列接続を connections 配列として具体化してからその結線だけ抜く
+        connections = [];
+        for (let i = 0; i < nodeCardRegistry.length - 1; i++) {
+          if (nodeCardRegistry[i] !== fromItem || nodeCardRegistry[i + 1] !== toItem) {
+            connections.push({ from: nodeCardRegistry[i].b.id, to: nodeCardRegistry[i + 1].b.id });
+          }
+        }
+      }
+      syncToActiveTab();
+      updateNodeWires();
+    });
+
+    nodeWireSvg.appendChild(hitPath);
+    nodeWireSvg.appendChild(path);
+  });
+
+  const svgW = Math.max(maxX, 2000);
+  const svgH = Math.max(maxY, 1500);
+  nodeWireSvg.setAttribute('width', svgW);
+  nodeWireSvg.setAttribute('height', svgH);
+  nodeGraphNodes.style.width = svgW + 'px';
+  nodeGraphNodes.style.height = svgH + 'px';
 }
 
 // 🧹 ノードを整列する
@@ -3515,12 +4356,28 @@ function updateStepHighlight() {
   }
 }
 
+function updateBlockStatus(b) {
+  if (!b) return;
+  const statusText = b._status === 'running' 
+    ? '実行中...' 
+    : (b._status === 'success' ? `✓ ${b._duration || '0.05s'}` : (b._status === 'error' ? '✕ エラー' : ''));
+
+  document.querySelectorAll(`.block-card[data-id="${b.id}"] .block-status-badge, .flow-node-card[data-index="${blocks.indexOf(b)}"] .block-status-badge`).forEach(badge => {
+    badge.className = `block-status-badge ${b._status || 'idle'}`;
+    badge.textContent = statusText;
+  });
+}
+
 async function executeNextStep() {
   if (!isStepRunning || currentStepIndex >= blocks.length) return;
 
   const b = blocks[currentStepIndex];
   const def = getBlockDef(b.type);
   const cmd = generateBlockCommand(b);
+
+  const stepStartTime = Date.now();
+  b._status = 'running';
+  updateBlockStatus(b);
 
   outputLog.textContent += `----------------------------------------\n[ステップ ${currentStepIndex + 1}: ${def.name}]\n$ ${cmd}\n`;
   outputLog.scrollTop = outputLog.scrollHeight;
@@ -3532,6 +4389,10 @@ async function executeNextStep() {
     if (isDemoMode) {
       await new Promise(r => setTimeout(r, 400));
       outputLog.textContent += `(正常に終了しました)\n\n`;
+      const stepDur = ((Date.now() - stepStartTime) / 1000).toFixed(2);
+      b._status = 'success';
+      b._duration = `${stepDur}s`;
+      updateBlockStatus(b);
     } else {
       const res = await fetch('/api/execute', {
         method: 'POST',
@@ -3541,6 +4402,7 @@ async function executeNextStep() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let stepOk = true;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -3555,17 +4417,27 @@ async function executeNextStep() {
             if (ev.type === 'stdout' || ev.type === 'stderr') {
               outputLog.textContent += ev.text;
               outputLog.scrollTop = outputLog.scrollHeight;
-            } else if (ev.type === 'done' && !ev.ok) {
-              const diag = ev.explanation || diagnoseErrorClient(outputLog.textContent, ev.exitCode);
-              renderErrorDiagnosis(diag);
+            } else if (ev.type === 'done') {
+              stepOk = ev.ok;
+              if (!ev.ok) {
+                const diag = ev.explanation || diagnoseErrorClient(outputLog.textContent, ev.exitCode);
+                renderErrorDiagnosis(diag);
+              }
             }
           } catch(e) {}
         }
       }
       outputLog.textContent += '\n';
+
+      const stepDur = ((Date.now() - stepStartTime) / 1000).toFixed(2);
+      b._status = stepOk ? 'success' : 'error';
+      b._duration = `${stepDur}s`;
+      updateBlockStatus(b);
     }
   } catch(err) {
     outputLog.textContent += `[エラー]: ${err.message}\n`;
+    b._status = 'error';
+    updateBlockStatus(b);
     renderErrorDiagnosis({
       badge: 'ステップ実行エラー',
       summary: 'ステップの実行中にエラーが発生しました',
@@ -3773,6 +4645,11 @@ async function executeScript(script) {
   explanationBox.classList.add('hidden');
   outputLog.textContent = ''; // リアルタイム受信のためクリア
 
+  blocks.forEach(b => {
+    b._status = 'running';
+    updateBlockStatus(b);
+  });
+
   const isAdmin = toggleRunAsAdmin && toggleRunAsAdmin.checked;
   const finalScript = isAdmin 
     ? (isUnix() ? `sudo bash -c '${script}'` : `Write-Output "※ 管理者権限で起動しています..."; ${script}`)
@@ -3807,6 +4684,11 @@ async function executeScript(script) {
         durationBadge.classList.remove('hidden');
         statusBadge.className = 'status-indicator success';
         statusBadge.textContent = '完了 (デモ)';
+        blocks.forEach(b => {
+          b._status = 'success';
+          b._duration = '0.08s';
+          updateBlockStatus(b);
+        });
         saveExecutionHistory(true, outputLog.textContent);
       }
     }, 70);
@@ -3856,11 +4738,21 @@ async function executeScript(script) {
             if (ev.ok) {
               statusBadge.className = 'status-indicator success';
               statusBadge.textContent = 'おわりました';
+              const avgDur = ev.duration ? (parseFloat(ev.duration) / Math.max(1, blocks.length)).toFixed(2) : '0.05';
+              blocks.forEach(b => {
+                b._status = 'success';
+                b._duration = `${avgDur}s`;
+                updateBlockStatus(b);
+              });
               renderErrorDiagnosis(null);
               saveExecutionHistory(true, outputLog.textContent);
             } else {
               statusBadge.className = 'status-indicator error';
               statusBadge.textContent = '途中でストップしました';
+              blocks.forEach(b => {
+                if (b._status === 'running') b._status = 'error';
+                updateBlockStatus(b);
+              });
               const diag = ev.explanation || diagnoseErrorClient(outputLog.textContent, ev.exitCode);
               renderErrorDiagnosis(diag);
               saveExecutionHistory(false, outputLog.textContent);
@@ -3869,6 +4761,10 @@ async function executeScript(script) {
             outputLog.textContent += `\n[エラー]: ${ev.message}\n`;
             statusBadge.className = 'status-indicator error';
             statusBadge.textContent = 'エラー';
+            blocks.forEach(b => {
+              b._status = 'error';
+              updateBlockStatus(b);
+            });
             const diag = diagnoseErrorClient(outputLog.textContent, 1);
             renderErrorDiagnosis(diag);
             saveExecutionHistory(false, outputLog.textContent);
@@ -3882,6 +4778,10 @@ async function executeScript(script) {
     btnStopProcess.classList.add('hidden');
     statusBadge.className = 'status-indicator error';
     statusBadge.textContent = '通信エラー';
+    blocks.forEach(b => {
+      b._status = 'error';
+      updateBlockStatus(b);
+    });
     outputLog.textContent = 'サーバーとの通信でエラーが出ました: ' + err.message;
     renderErrorDiagnosis({
       badge: '接続エラー (Network)',
