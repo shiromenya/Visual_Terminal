@@ -1,4 +1,4 @@
-// server.js - Graphical Terminal Backend (Windows / macOS / Linux 両対応)
+// server.js - Visual Terminal Backend (Windows / macOS / Linux 両対応)
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -537,6 +537,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   const osLabel = isWindows ? 'Windows' : (isMac ? 'macOS' : 'Linux');
-  console.log(`[Graphical Terminal] サーバーが起動しました (${osLabel}): http://127.0.0.1:${PORT}`);
-  console.log(`[Graphical Terminal] 初期作業ディレクトリ: ${currentWorkingDir}`);
+  console.log(`[Visual Terminal] サーバーが起動しました (${osLabel}): http://127.0.0.1:${PORT}`);
+  console.log(`[Visual Terminal] 初期作業ディレクトリ: ${currentWorkingDir}`);
 });

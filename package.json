@@ -1,7 +1,7 @@
 {
-  "name": "graphical-terminal",
+  "name": "visual-terminal",
   "version": "0.1.0",
-  "description": "No-Code, Block-Based Graphical Terminal for Everyone",
+  "description": "No-Code, Block-Based Visual Terminal for Everyone",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,6 +10,7 @@
   "keywords": [
     "terminal",
     "cli",
+    "visual-terminal",
     "graphical-terminal",
     "no-code",
     "gui",
@@ -19,11 +20,11 @@
     "beginner-friendly",
     "open-source"
   ],
-  "author": "Graphical Terminal Contributors",
+  "author": "Visual Terminal Contributors",
   "license": "MIT",
-  "homepage": "https://github.com/your-username/graphical-terminal",
+  "homepage": "https://github.com/your-username/visual-terminal",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/graphical-terminal.git"
+    "url": "https://github.com/your-username/visual-terminal.git"
   }
 }
