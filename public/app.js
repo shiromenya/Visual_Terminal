@@ -98,10 +98,33 @@ function resolveVariables(str, blockIndex, incomingOutput) {
 // 📖 全コマンド図鑑データベース（Microsoft公式 Windows Commands 逆引き集）
 const COMMAND_CATALOG = [
   {
+    id: 'rsync-sync',
+    name: 'rsync でファイル高速転送・同期 (SSH/ローカル)',
+    cmd: 'rsync',
+    category: 'file',
+    level: 'beginner',
+    desc: 'SSH経由でリモートサーバーとファイルを高速にアップロード/ダウンロードしたり、フォルダの完全ミラーリングを行います。',
+    fields: [
+      { id: 'mode', label: '同期モード', type: 'select', default: 'upload', options: [
+        { value: 'upload', label: '【アップロード】ローカル ➔ リモートサーバー (SSH)' },
+        { value: 'download', label: '【ダウンロード】リモートサーバー ➔ ローカル (SSH)' },
+        { value: 'local', label: '【ローカルミラーリング】フォルダA ➔ フォルダB' },
+        { value: 'dry_run', label: '【Dry-Run テスト】実際には送らず事前シミュレーション' }
+      ]},
+      { id: 'source', label: '転送元 (Source)', type: 'text', placeholder: '例: ./dist/ または user@remote.com:/var/www/', default: './dist/' },
+      { id: 'dest', label: '転送先 (Destination)', type: 'text', placeholder: '例: user@remote.com:/var/www/ または ./backup/', default: 'user@remote.example.com:/var/www/html/' }
+    ],
+    generateCommand: (params, blockIndex, incomingOutput) => {
+      const src = resolveVariables(params.source || './dist/', blockIndex, incomingOutput);
+      const dst = resolveVariables(params.dest || './backup/', blockIndex, incomingOutput);
+      return `rsync -avz --progress "${src}" "${dst}"`;
+    }
+  },
+  {
     id: 'condition-if',
     name: 'もし〜なら (条件分岐 If/Else)',
     cmd: 'if / else',
-    category: 'script',
+    category: 'condition',
     level: 'beginner',
     desc: '「直前のコマンドが成功したら」「出力に特定文字が含まれたら」などの条件で、実行するコマンドを分岐します。',
     fields: [
@@ -142,7 +165,7 @@ const COMMAND_CATALOG = [
     id: 'if-file-exists',
     name: 'ファイルが存在するかどうかで分岐 (Test-Path)',
     cmd: 'test-path',
-    category: 'script',
+    category: 'condition',
     level: 'beginner',
     desc: '指定したファイルやフォルダが存在するかどうかを確認し、存在する場合/しない場合で処理を切り替えます。',
     fields: [
@@ -413,6 +436,19 @@ COMMAND_CATALOG.forEach(item => {
 
 // 既存の標準ブロック群を追加統合
 Object.assign(BUILTIN_BLOCKS, {
+  'group-block': {
+    name: '📦 サブフロー (処理グループ)',
+    category: 'condition',
+    badge: 'subflow',
+    desc: '複数のブロックを1つにまとめてスッキリ整理します。クリックで展開・折りたたみ可能。',
+    fields: [
+      { id: 'title', label: 'グループ名', type: 'text', placeholder: '例: ログ集計＆通知一式', default: '新しい処理グループ' }
+    ],
+    generateCommand: (params, blockIndex, incomingOutput) => {
+      // 実際のコマンド生成は generateBlockCommand 側で children を再帰処理
+      return 'echo "サブフロー実行"';
+    }
+  },
   'battery-report': {
     name: 'ノートPCのバッテリー寿命を調べる (powercfg)',
     category: 'system',
@@ -440,6 +476,47 @@ Object.assign(BUILTIN_BLOCKS, {
         return `rsync -av --delete "${src}/" "${dst}/" && echo "同期（ミラーリング）が完了しました"`;
       }
       return `robocopy "${src}" "${dst}" /MIR /R:2 /W:2 /NP; Write-Output "同期（ミラーリング）が完了しました"`;
+    }
+  },
+
+  'rsync-sync': {
+    name: 'rsync でファイル高速転送・同期 (リモート/ローカル)',
+    category: 'file',
+    badge: 'rsync',
+    desc: 'SSH経由でリモートサーバーとファイルを高速にアップロード/ダウンロードしたり、フォルダの完全ミラーリングを行います。',
+    fields: [
+      { id: 'mode', label: '同期モード', type: 'select', default: 'upload', options: [
+        { value: 'upload', label: '【アップロード】ローカル ➔ リモートサーバー (SSH)' },
+        { value: 'download', label: '【ダウンロード】リモートサーバー ➔ ローカル (SSH)' },
+        { value: 'local', label: '【ローカルミラーリング】フォルダA ➔ フォルダB' },
+        { value: 'dry_run', label: '【Dry-Run テスト】実際には送らず事前シミュレーション' }
+      ]},
+      { id: 'source', label: '転送元 (Source)', type: 'text', placeholder: '例: ./dist/ または user@remote.com:/var/www/', default: './dist/' },
+      { id: 'dest', label: '転送先 (Destination)', type: 'text', placeholder: '例: user@remote.com:/var/www/ または ./backup/', default: 'user@remote.example.com:/var/www/html/' },
+      { id: 'delete', label: '転送先で不要なファイルを削除 (--delete)', type: 'select', default: 'yes', options: [
+        { value: 'yes', label: '有効 (完全同期・同一化)' },
+        { value: 'no', label: '無効 (転送先にあるファイルは残す)' }
+      ]},
+      { id: 'sshKey', label: 'SSH秘密鍵のパス (任意)', type: 'text', placeholder: '例: ~/.ssh/id_rsa (未入力ならデフォルトSSH鍵)', default: '' }
+    ],
+    generateCommand: (params, blockIndex, incomingOutput) => {
+      const src = resolveVariables(params.source || './dist/', blockIndex, incomingOutput);
+      const dst = resolveVariables(params.dest || './backup/', blockIndex, incomingOutput);
+      const key = resolveVariables(params.sshKey || '', blockIndex, incomingOutput);
+      const isDelete = params.delete === 'yes';
+      const isDryRun = params.mode === 'dry_run';
+
+      let flags = ['-avz', '--progress'];
+      if (isDelete) flags.push('--delete');
+      if (isDryRun) flags.push('-n');
+      if (key) {
+        flags.push(`-e "ssh -i ${key}"`);
+      } else {
+        flags.push('-e ssh');
+      }
+
+      const flagStr = flags.join(' ');
+      return `rsync ${flagStr} "${src}" "${dst}"`;
     }
   },
 
@@ -774,7 +851,7 @@ Object.assign(BUILTIN_BLOCKS, {
 
   'prompt-input': {
     name: '人に質問して文字を入力してもらう',
-    category: 'custom',
+    category: 'condition',
     fields: [
       { id: 'question', label: '質問する内容', type: 'text', placeholder: '例: ファイル名は何にしますか？', default: 'ファイル名は何にしますか？' },
       { id: 'defaultVal', label: '最初に入っている文字', type: 'text', placeholder: '例: my_memo.txt', default: 'my_memo.txt' }
@@ -788,7 +865,7 @@ Object.assign(BUILTIN_BLOCKS, {
 
   'loop-count': {
     name: '〇回繰り返す (指定回数)',
-    category: 'custom',
+    category: 'condition',
     fields: [
       { id: 'count', label: '何回繰り返す？', type: 'select', options: [
         { value: '3', label: '3回' },
@@ -806,7 +883,7 @@ Object.assign(BUILTIN_BLOCKS, {
 
   'foreach-loop': {
     name: '1行ずつ同じ処理を繰り返す',
-    category: 'custom',
+    category: 'condition',
     fields: [
       { id: 'action', label: '各行に行う命令', type: 'text', placeholder: '例: echo "処理中: $line"', default: 'echo "アイテム: $line"' }
     ],
@@ -819,7 +896,7 @@ Object.assign(BUILTIN_BLOCKS, {
 
   'condition-if': {
     name: 'もし〜なら／そうでなければ (If/Else)',
-    category: 'custom',
+    category: 'condition',
     fields: [
       { id: 'condType', label: 'どんなとき？', type: 'select', options: [
         { value: 'file_exists', label: '指定したファイルが存在するとき' },
@@ -890,7 +967,7 @@ Object.assign(BUILTIN_BLOCKS, {
 
   'sleep-wait': {
     name: '〇秒待つ (一時停止)',
-    category: 'custom',
+    category: 'condition',
     fields: [
       { id: 'seconds', label: '何秒待つ？', type: 'select', options: [
         { value: '1', label: '1秒' },
@@ -1916,7 +1993,7 @@ Object.assign(BUILTIN_BLOCKS, {
 
   'if-file-exists': {
     name: 'ファイルが存在するか調べて分岐する',
-    category: 'logic',
+    category: 'condition',
     cmd: 'Test-Path / [ -e ]',
     fields: [
       { id: 'path', label: '調べるパス', type: 'text', placeholder: 'memo.txt または ./data', default: 'memo.txt' }
@@ -1932,7 +2009,7 @@ Object.assign(BUILTIN_BLOCKS, {
 
   'try-catch-block': {
     name: 'エラーが起きても停止せず安全に続ける',
-    category: 'logic',
+    category: 'condition',
     cmd: 'try-catch / || true',
     fields: [
       { id: 'cmd', label: '実行する命令', type: 'text', placeholder: 'dir non_exist', default: 'Get-ChildItem -Path non_exist' }
@@ -2348,7 +2425,7 @@ Object.assign(BUILTIN_BLOCKS, {
 
   'choice-prompt': {
     name: '[Y/N] キー選択入力を待機 (choice)',
-    category: 'logic',
+    category: 'condition',
     cmd: 'choice / read',
     fields: [
       { id: 'message', label: '表示する案内文', type: 'text', placeholder: '例: 本当に続行しますか？', default: '続行しますか？' },
@@ -3586,6 +3663,40 @@ function setupEventListeners() {
     btnCreateMacro.addEventListener('click', createMacroFromBlocks);
   }
 
+  // 📦 グループ化ボタン関連
+  const btnGroupBlocks = document.getElementById('btnGroupBlocks');
+  if (btnGroupBlocks) {
+    btnGroupBlocks.addEventListener('click', openGroupModal);
+  }
+
+  const btnGroupModalClose = document.getElementById('btnGroupModalClose');
+  if (btnGroupModalClose) {
+    btnGroupModalClose.addEventListener('click', () => {
+      document.getElementById('groupModal').classList.add('hidden');
+    });
+  }
+
+  const btnGroupModalCancel = document.getElementById('btnGroupModalCancel');
+  if (btnGroupModalCancel) {
+    btnGroupModalCancel.addEventListener('click', () => {
+      document.getElementById('groupModal').classList.add('hidden');
+    });
+  }
+
+  const btnGroupModalSubmit = document.getElementById('btnGroupModalSubmit');
+  if (btnGroupModalSubmit) {
+    btnGroupModalSubmit.addEventListener('click', submitGroupModal);
+  }
+
+  const btnGroupSelectAll = document.getElementById('btnGroupSelectAll');
+  if (btnGroupSelectAll) {
+    btnGroupSelectAll.addEventListener('click', () => {
+      const chks = document.querySelectorAll('#groupModalBlockList .group-select-chk');
+      const allChecked = Array.from(chks).every(c => c.checked);
+      chks.forEach(c => c.checked = !allChecked);
+    });
+  }
+
   // 🧹 ノード自動整列ボタン
   if (btnAlignNodes) {
     btnAlignNodes.addEventListener('click', alignNodes);
@@ -3948,6 +4059,18 @@ function loadPreset(key) {
 }
 
 function generateBlockCommand(b, blockIndex, incomingOutput) {
+  if (b.type === 'group-block') {
+    const children = b.children || [];
+    if (children.length === 0) return isUnix() ? 'true' : 'Write-Output "（空の処理グループ）"';
+    const cmds = [];
+    let currentOut = incomingOutput;
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      const cmd = generateBlockCommand(child, i, currentOut);
+      if (cmd) cmds.push(cmd);
+    }
+    return cmds.join(isUnix() ? ' && ' : ' ; ');
+  }
   const def = getBlockDef(b.type);
   if (!def) return '';
 
@@ -4004,6 +4127,178 @@ function renderCanvas() {
   blocks.forEach((b, index) => {
     const def = getBlockDef(b.type);
     if (!def) return;
+
+    // 📦 group-block の場合のカスタムレンダリング
+    if (b.type === 'group-block') {
+      const children = b.children || [];
+      const isCollapsed = b.params._collapsed !== false;
+
+      const groupCard = document.createElement('div');
+      groupCard.className = 'block-card group-block-card condition';
+      groupCard.setAttribute('data-id', b.id);
+      groupCard.setAttribute('draggable', 'true');
+
+      groupCard.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', String(index));
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(() => groupCard.classList.add('dragging'), 0);
+      });
+      groupCard.addEventListener('dragend', () => groupCard.classList.remove('dragging'));
+      groupCard.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        groupCard.classList.add('drag-over');
+      });
+      groupCard.addEventListener('dragleave', () => groupCard.classList.remove('drag-over'));
+      groupCard.addEventListener('drop', (e) => {
+        e.preventDefault();
+        groupCard.classList.remove('drag-over');
+        const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        if (fromIndex !== index) moveBlockTo(fromIndex, index);
+      });
+
+      const header = document.createElement('div');
+      header.className = 'block-card-header';
+      header.innerHTML = `
+        <div class="header-left">
+          <span class="drag-handle" title="ドラッグして並べ替え">:::</span>
+          <span style="font-size: 15px;">📦</span>
+          <input type="text" class="group-title-input" value="${escapeHtml(b.params.title || '処理グループ')}" title="クリックして名前を変更">
+          <span class="group-step-count-badge">${children.length} ステップ</span>
+        </div>
+        <div class="block-actions">
+          <button class="btn btn-tiny btn-group-toggle" style="margin-right: 4px;">${isCollapsed ? '▼ 展開' : '▲ 折りたたむ'}</button>
+          <button class="btn btn-tiny btn-ungroup" title="グループを解体して元に戻す" style="margin-right: 4px;">🔓 解除</button>
+          <button class="icon-btn btn-up" title="上へ移動"><svg class="ui-icon xs" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg></button>
+          <button class="icon-btn btn-down" title="下へ移動"><svg class="ui-icon xs" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="icon-btn btn-delete" title="グループごと削除"><svg class="ui-icon xs" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+      `;
+
+      const titleInput = header.querySelector('.group-title-input');
+      titleInput.addEventListener('input', (e) => {
+        b.params.title = e.target.value;
+      });
+
+      header.querySelector('.btn-group-toggle').addEventListener('click', () => {
+        b.params._collapsed = !isCollapsed;
+        renderCanvas();
+      });
+
+      header.querySelector('.btn-ungroup').addEventListener('click', () => {
+        ungroupBlock(index);
+      });
+
+      header.querySelector('.btn-up').addEventListener('click', () => moveBlock(index, -1));
+      header.querySelector('.btn-down').addEventListener('click', () => moveBlock(index, 1));
+      header.querySelector('.btn-delete').addEventListener('click', () => removeBlock(index));
+
+      const body = document.createElement('div');
+      body.className = 'block-card-body';
+
+      if (isCollapsed) {
+        // 折りたたみ表示: 横並びのステップサマリー
+        const summaryFlow = document.createElement('div');
+        summaryFlow.className = 'group-summary-flow';
+        if (children.length === 0) {
+          summaryFlow.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">（空のグループです。「▼ 展開」してブロックを追加してください）</span>';
+        } else {
+          children.forEach((child, cIdx) => {
+            const cDef = getBlockDef(child.type);
+            const cName = cDef ? cDef.name : child.type;
+            const chip = document.createElement('span');
+            chip.className = 'group-chip-item';
+            chip.textContent = `${cIdx + 1}. ${cName}`;
+            summaryFlow.appendChild(chip);
+
+            if (cIdx < children.length - 1) {
+              const arrow = document.createElement('span');
+              arrow.className = 'group-chip-arrow';
+              arrow.textContent = '➔';
+              summaryFlow.appendChild(arrow);
+            }
+          });
+        }
+        body.appendChild(summaryFlow);
+      } else {
+        // 展開表示: インナーコンテナ
+        const innerContainer = document.createElement('div');
+        innerContainer.className = 'group-inner-canvas';
+
+        children.forEach((child, cIdx) => {
+          const cDef = getBlockDef(child.type);
+          if (!cDef) return;
+
+          const childCard = document.createElement('div');
+          childCard.className = `block-card ${cDef.category || ''}`;
+          
+          const childHeader = document.createElement('div');
+          childHeader.className = 'block-card-header';
+          childHeader.innerHTML = `
+            <div class="header-left">
+              <span class="block-title">${cIdx + 1}. ${escapeHtml(cDef.name)}</span>
+              <span class="catalog-cmd-badge" style="font-size: 9px;">${escapeHtml(cDef.badge || child.type)}</span>
+            </div>
+            <div class="block-actions">
+              <button class="icon-btn btn-child-delete" title="このブロックのみグループから削除"><svg class="ui-icon xs" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+          `;
+
+          childHeader.querySelector('.btn-child-delete').addEventListener('click', () => {
+            pushHistory();
+            children.splice(cIdx, 1);
+            renderCanvas();
+          });
+
+          const childBody = document.createElement('div');
+          childBody.className = 'block-card-body';
+          
+          (cDef.fields || []).forEach(f => {
+            const row = document.createElement('div');
+            row.className = 'form-row';
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.textContent = f.label;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'form-input';
+            input.value = child.params[f.id] || '';
+            input.placeholder = f.placeholder || '';
+            input.addEventListener('input', (e) => {
+              child.params[f.id] = e.target.value;
+            });
+
+            row.appendChild(label);
+            row.appendChild(input);
+            childBody.appendChild(row);
+          });
+
+          childCard.appendChild(childHeader);
+          childCard.appendChild(childBody);
+          innerContainer.appendChild(childCard);
+        });
+
+        body.appendChild(innerContainer);
+      }
+
+      // プレビュー
+      const preview = document.createElement('div');
+      preview.className = 'internal-cmd-preview';
+      preview.textContent = `$ ${generateBlockCommand(b)}`;
+      body.appendChild(preview);
+
+      groupCard.appendChild(header);
+      groupCard.appendChild(body);
+      canvasStack.appendChild(groupCard);
+
+      // コネクタ
+      if (index < blocks.length - 1) {
+        const arrow = document.createElement('div');
+        arrow.className = 'connector-arrow';
+        canvasStack.appendChild(arrow);
+      }
+      return;
+    }
 
     const card = document.createElement('div');
     card.className = `block-card ${def.category || ''}`;
@@ -4214,7 +4509,8 @@ function renderNodeGraph() {
 
     const card = document.createElement('div');
     const isDanger = def.isDanger || b.type === 'delete-file' || b.type === 'cipher-wipe';
-    card.className = `flow-node-card ${isDanger ? 'danger-node' : ''}`;
+    const isGroup = b.type === 'group-block';
+    card.className = `flow-node-card ${isDanger ? 'danger-node' : ''} ${isGroup ? 'group-node condition' : ''}`;
     card.setAttribute('data-index', String(index));
     card.style.left = `${b._pos.x}px`;
     card.style.top = `${b._pos.y}px`;
@@ -4305,7 +4601,35 @@ function renderNodeGraph() {
     }
 
     // 各フィールドの入力UI（ブロックと全く同じように設定変更可能）
-    if (def.fields && def.fields.length > 0) {
+    if (b.type === 'group-block') {
+      const children = b.children || [];
+      const flow = document.createElement('div');
+      flow.className = 'group-summary-flow';
+      flow.style.margin = '4px 0';
+      if (children.length === 0) {
+        flow.innerHTML = '<span style="font-size: 10px; color: #94a3b8;">（空のグループ）</span>';
+      } else {
+        children.forEach((c, ci) => {
+          const cd = getBlockDef(c.type);
+          const span = document.createElement('span');
+          span.className = 'group-chip-item';
+          span.style.fontSize = '10px';
+          span.textContent = `${ci + 1}. ${cd ? cd.name : c.type}`;
+          flow.appendChild(span);
+        });
+      }
+      body.appendChild(flow);
+
+      const unBtn = document.createElement('button');
+      unBtn.className = 'btn btn-tiny';
+      unBtn.style.marginTop = '6px';
+      unBtn.textContent = '🔓 グループ解除';
+      unBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ungroupBlock(index);
+      });
+      body.appendChild(unBtn);
+    } else if (def.fields && def.fields.length > 0) {
       def.fields.forEach(field => {
         const rowEl = document.createElement('div');
         rowEl.className = 'form-row';
@@ -5845,3 +6169,89 @@ print(data.get("stdout"))`;
 }
 
 init();
+
+// ================= 📦 グループ化 (サブフロー) ロジック =================
+function openGroupModal() {
+  if (blocks.length < 2) {
+    alert('グループ化するには、キャンバスにブロックが少なくとも2つ以上必要です。');
+    return;
+  }
+  const modal = document.getElementById('groupModal');
+  const listEl = document.getElementById('groupModalBlockList');
+  const titleInput = document.getElementById('groupModalTitleInput');
+  if (!modal || !listEl) return;
+
+  titleInput.value = '新しい処理グループ';
+  listEl.innerHTML = '';
+
+  blocks.forEach((b, idx) => {
+    const def = getBlockDef(b.type);
+    const name = (b.type === 'group-block' && b.params.title) ? `📦 ${b.params.title}` : (def ? def.name : b.type);
+    const itemRow = document.createElement('label');
+    itemRow.className = 'group-select-item';
+    itemRow.innerHTML = `
+      <input type="checkbox" class="group-select-chk" data-index="${idx}" checked>
+      <span style="font-weight: 600; color: var(--primary);">#${idx + 1}</span>
+      <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(name)}</span>
+    `;
+    listEl.appendChild(itemRow);
+  });
+
+  modal.classList.remove('hidden');
+}
+
+function submitGroupModal() {
+  const modal = document.getElementById('groupModal');
+  const listEl = document.getElementById('groupModalBlockList');
+  const titleInput = document.getElementById('groupModalTitleInput');
+  const title = (titleInput && titleInput.value.trim()) ? titleInput.value.trim() : '処理グループ';
+
+  const chks = listEl.querySelectorAll('.group-select-chk:checked');
+  if (chks.length < 2) {
+    alert('少なくとも2つ以上のブロックにチェックを入れてください。');
+    return;
+  }
+
+  const selectedIndices = Array.from(chks).map(c => Number(c.getAttribute('data-index'))).sort((a, b) => a - b);
+  const firstIndex = selectedIndices[0];
+
+  pushHistory();
+
+  // 選択されたブロックたちを取り出す
+  const groupedChildren = [];
+  selectedIndices.forEach(idx => {
+    groupedChildren.push(JSON.parse(JSON.stringify(blocks[idx])));
+  });
+
+  // 後ろのインデックスから順に元の配列から削除
+  for (let i = selectedIndices.length - 1; i >= 0; i--) {
+    blocks.splice(selectedIndices[i], 1);
+  }
+
+  // 最初のインデックス位置に新しい group-block を挿入
+  const groupBlock = {
+    id: 'b_' + Math.random().toString(36).substr(2, 9),
+    type: 'group-block',
+    params: {
+      title: title,
+      _collapsed: true
+    },
+    children: groupedChildren
+  };
+
+  blocks.splice(firstIndex, 0, groupBlock);
+
+  modal.classList.add('hidden');
+  renderCanvas();
+}
+
+function ungroupBlock(index) {
+  if (index < 0 || index >= blocks.length) return;
+  const b = blocks[index];
+  if (b.type !== 'group-block') return;
+
+  pushHistory();
+  const children = b.children || [];
+  blocks.splice(index, 1, ...children);
+  renderCanvas();
+}

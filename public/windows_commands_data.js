@@ -504,7 +504,7 @@ window.WINDOWS_ALL_COMMANDS = [
   {
     "cmd": "choice",
     "name": "ユーザー入力の選択肢待機 (Y/N)",
-    "category": "script",
+    "category": "condition",
     "level": "beginner",
     "desc": "バッチ処理中にキーボードから「Y」や「N」などの選択肢キー入力を求めます。",
     "url": "https://learn.microsoft.com/ja-jp/windows-server/administration/windows-commands/choice",
@@ -1426,7 +1426,7 @@ window.WINDOWS_ALL_COMMANDS = [
   {
     "cmd": "if",
     "name": "条件分岐・判定 (If/Else)",
-    "category": "script",
+    "category": "condition",
     "level": "beginner",
     "desc": "ファイルが存在するか、直前のコマンドが成功したか(ERRORLEVEL)、変数の値が一致するか等で処理を分岐します。",
     "url": "https://learn.microsoft.com/ja-jp/windows-server/administration/windows-commands/if",

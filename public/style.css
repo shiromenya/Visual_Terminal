@@ -2747,3 +2747,149 @@ body {
   max-height: 120px;
   overflow-y: auto;
 }
+
+/* 6. 🔀 条件分岐・判定・フロー制御 専用スタイル (パープル/バイオレット) */
+.block-card.condition {
+  border-left: 4px solid #a855f7 !important;
+}
+
+.block-card.condition .block-card-header {
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.08) 0%, transparent 100%);
+}
+
+.flow-node-card.condition {
+  border-color: #a855f7 !important;
+}
+
+.flow-node-card.condition:hover {
+  border-color: #c084fc !important;
+  box-shadow: 0 12px 30px rgba(168, 85, 247, 0.35) !important;
+}
+
+.flow-node-card.condition .flow-node-header {
+  border-bottom-color: rgba(168, 85, 247, 0.4) !important;
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.2) 0%, transparent 100%);
+}
+
+.cat-tab[data-cat="condition"].active {
+  background: #a855f7 !important;
+  border-color: #a855f7 !important;
+  color: #ffffff !important;
+}
+
+/* 7. 📦 グループ化 (サブフロー / フォルダ型コンテナ) */
+.group-select-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  margin-bottom: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+
+.group-select-item:hover {
+  border-color: var(--primary);
+  background: var(--bg-surface);
+}
+
+.group-select-item input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.group-block-card {
+  border-left: 4px solid #06b6d4 !important; /* シアン系カラー */
+  background: var(--card-bg);
+}
+
+.group-title-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-main);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 2px 6px;
+  width: 220px;
+}
+
+.group-title-input:hover,
+.group-title-input:focus {
+  background: var(--input-bg);
+  border-color: var(--border-color);
+  outline: none;
+}
+
+.group-step-count-badge {
+  font-size: 10px;
+  background: rgba(6, 182, 212, 0.15);
+  color: #06b6d4;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+/* 折りたたみ時のサマリーパイプラインチップ */
+.group-summary-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(6, 182, 212, 0.04);
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(6, 182, 212, 0.25);
+  margin-top: 4px;
+}
+
+.group-chip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--text-main);
+}
+
+.group-chip-arrow {
+  color: var(--text-light);
+  font-size: 10px;
+}
+
+/* 展開時のインナーエリア */
+.group-inner-canvas {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px dashed rgba(6, 182, 212, 0.35);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-inner-canvas .block-card {
+  margin-bottom: 0;
+  box-shadow: none;
+  background: var(--bg-surface);
+}
+
+.flow-node-card.group-node {
+  border-color: #06b6d4 !important;
+}
+
+.flow-node-card.group-node .flow-node-header {
+  border-bottom-color: rgba(6, 182, 212, 0.4) !important;
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.2) 0%, transparent 100%);
+}
+
+
